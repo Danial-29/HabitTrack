@@ -20,7 +20,6 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
     // Find max time for scaling
     const maxTime = Math.max(...data.map(d => d.totalTimeInBed), 480) // At least 8 hours
 
-    const chartHeight = 180
     const barHeight = 20
     const barGap = 8
     const padding = { top: 20, bottom: 30, left: 10, right: 40 }
