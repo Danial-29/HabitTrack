@@ -476,7 +476,8 @@ export const useSleepData = () => {
         return periodLogs.map(log => ({
             date: log.date,
             lightsOut: log.lightsOut,
-            wakeUp: log.wakeUp
+            wakeUp: log.wakeUp,
+            outOfBed: log.outOfBed
         }))
     }
 

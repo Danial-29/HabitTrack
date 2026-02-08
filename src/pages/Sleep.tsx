@@ -295,6 +295,14 @@ export default function Sleep() {
                                         <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Wake Up</p>
                                         <p className="text-lg font-bold text-white">{selectedLog.wakeUp}</p>
                                     </div>
+                                    <div className="p-3 rounded-xl bg-white/5 border border-white/5 text-center">
+                                        <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Out of Bed</p>
+                                        <p className="text-lg font-bold text-white">{selectedLog.outOfBed}</p>
+                                    </div>
+                                    <div className="p-3 rounded-xl bg-white/5 border border-white/5 text-center">
+                                        <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Time in Bed</p>
+                                        <p className="text-lg font-bold text-white">{Math.floor(stats.totalTimeInBed / 60)}h {stats.totalTimeInBed % 60}m</p>
+                                    </div>
                                 </div>
 
                                 {/* Key Metrics */}
@@ -304,7 +312,7 @@ export default function Sleep() {
                                         <span className="text-sm font-bold text-blue-400">{Math.round(stats.sleepEfficiency)}%</span>
                                     </div>
                                     <div className="flex justify-between items-center p-3 rounded-xl bg-white/5 border border-white/5">
-                                        <span className="text-sm text-slate-300">Duration</span>
+                                        <span className="text-sm text-slate-300">Sleep Duration</span>
                                         <span className="text-sm font-bold text-emerald-400">{Math.floor(stats.totalSleepTime / 60)}h {stats.totalSleepTime % 60}m</span>
                                     </div>
                                     <div className="flex justify-between items-center p-3 rounded-xl bg-white/5 border border-white/5">

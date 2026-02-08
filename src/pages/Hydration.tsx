@@ -9,12 +9,14 @@ import {
     Loader2
 } from 'lucide-react'
 import { useHydrationData } from '../hooks/useHydrationData'
+import type { Preset } from '../hooks/useHydrationData'
 
 export default function Hydration() {
     const navigate = useNavigate()
     const [isCustomModalOpen, setIsCustomModalOpen] = useState(false)
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false)
     const [customAmount, setCustomAmount] = useState('')
+    const [customLabel, setCustomLabel] = useState('')
     const [saveAsPreset, setSaveAsPreset] = useState(false)
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
     const [presetToDelete, setPresetToDelete] = useState<number | null>(null)
@@ -52,20 +54,21 @@ export default function Hydration() {
         await addLog(amount, label)
     }
 
-    const handlePressStart = (amount: number) => {
+    const handlePressStart = (preset: Preset) => {
         isLongPress.current = false
         timerRef.current = setTimeout(() => {
             isLongPress.current = true
-            handleDeletePreset(amount)
+            handleDeletePreset(preset.amount)
         }, 600)
     }
 
-    const handlePressEnd = async (amount: number) => {
+    const handlePressEnd = async (preset: Preset) => {
         if (timerRef.current) {
             clearTimeout(timerRef.current)
         }
         if (!isLongPress.current) {
-            await addIntake(amount, `${amount}ml Serving`)
+            const label = preset.label || `${preset.amount}ml Serving`
+            await addIntake(preset.amount, label)
         }
         isLongPress.current = false
     }
@@ -88,7 +91,7 @@ export default function Hydration() {
 
     const confirmDeletePreset = async () => {
         if (presetToDelete) {
-            await updatePresets(quickButtons.filter(b => b !== presetToDelete))
+            await updatePresets(quickButtons.filter(p => p.amount !== presetToDelete))
             setIsDeleteModalOpen(false)
             setPresetToDelete(null)
         }
@@ -98,11 +101,15 @@ export default function Hydration() {
         e.preventDefault()
         const amount = Number(customAmount)
         if (amount > 0) {
-            await addIntake(amount, "Custom Entry")
-            if (saveAsPreset && !quickButtons.includes(amount)) {
-                await updatePresets([...quickButtons, amount].sort((a, b) => a - b))
+            const label = customLabel.trim() || 'Custom Entry'
+            await addIntake(amount, label)
+            if (saveAsPreset && !quickButtons.some(p => p.amount === amount)) {
+                const newPreset = { amount, label: customLabel.trim() || undefined }
+                const newPresets = [...quickButtons, newPreset].sort((a, b) => a.amount - b.amount)
+                await updatePresets(newPresets)
             }
             setCustomAmount('')
+            setCustomLabel('')
             setSaveAsPreset(false)
             setIsCustomModalOpen(false)
         }
@@ -204,16 +211,19 @@ export default function Hydration() {
                 {/* Quick Add Controls (Dynamic Grid) */}
                 <div className="px-6 mt-8 space-y-4">
                     <div className="grid grid-cols-3 gap-3">
-                        {quickButtons.map(size => (
-                            <div key={size} className="relative">
+                        {quickButtons.map(preset => (
+                            <div key={preset.amount} className="relative">
                                 <button
-                                    onPointerDown={() => handlePressStart(size)}
-                                    onPointerUp={() => handlePressEnd(size)}
+                                    onPointerDown={() => handlePressStart(preset)}
+                                    onPointerUp={() => handlePressEnd(preset)}
                                     onPointerLeave={handlePressCancel}
                                     onContextMenu={(e) => e.preventDefault()}
                                     className={`w-full flex flex-col items-center justify-center h-20 rounded-xl ${glassCardClass} border-[#2b6cee]/30 hover:bg-[#2b6cee]/10 active:scale-95 transition-all select-none`}
                                 >
-                                    <span className="text-[#2b6cee] font-bold text-lg">{size}</span>
+                                    {preset.label && (
+                                        <span className="text-white/60 text-[10px] font-medium mb-0.5 truncate max-w-full px-2">{preset.label}</span>
+                                    )}
+                                    <span className="text-[#2b6cee] font-bold text-lg">{preset.amount}</span>
                                     <span className="text-[10px] uppercase font-bold text-[#2b6cee]/70">ml</span>
                                 </button>
                             </div>
@@ -272,123 +282,137 @@ export default function Hydration() {
                 <div className="h-8 w-full bg-[#101622]"></div>
 
                 {/* Custom Entry Modal */}
-                {isCustomModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="bg-[#101622] border border-white/10 w-full max-w-xs rounded-2xl p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
-                            <h3 className="text-lg font-bold text-center mb-6">Add Custom Amount</h3>
-                            <form onSubmit={handleCustomSubmit} className="space-y-4">
-                                <div className="relative">
+                {
+                    isCustomModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                            <div className="bg-[#101622] border border-white/10 w-full max-w-xs rounded-2xl p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+                                <h3 className="text-lg font-bold text-center mb-6">Add Custom Amount</h3>
+                                <form onSubmit={handleCustomSubmit} className="space-y-4">
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            autoFocus
+                                            value={customAmount}
+                                            onChange={(e) => setCustomAmount(e.target.value)}
+                                            placeholder="330"
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-center text-2xl font-bold focus:outline-none focus:border-[#2b6cee] focus:ring-1 focus:ring-[#2b6cee] placeholder:text-white/20 text-white transition-all"
+                                        />
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">ml</span>
+                                    </div>
+
                                     <input
-                                        type="number"
-                                        autoFocus
-                                        value={customAmount}
-                                        onChange={(e) => setCustomAmount(e.target.value)}
-                                        placeholder="330"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-center text-2xl font-bold focus:outline-none focus:border-[#2b6cee] focus:ring-1 focus:ring-[#2b6cee] placeholder:text-white/20 text-white transition-all"
+                                        type="text"
+                                        value={customLabel}
+                                        onChange={(e) => setCustomLabel(e.target.value)}
+                                        placeholder="Name this drink (optional)"
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2b6cee] focus:ring-1 focus:ring-[#2b6cee] placeholder:text-white/30 text-white transition-all"
                                     />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">ml</span>
-                                </div>
 
-                                <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/5">
-                                    <input
-                                        type="checkbox"
-                                        id="savePreset"
-                                        checked={saveAsPreset}
-                                        onChange={(e) => setSaveAsPreset(e.target.checked)}
-                                        className="w-5 h-5 rounded border-gray-600 text-[#2b6cee] focus:ring-[#2b6cee] bg-white/10 cursor-pointer"
-                                    />
-                                    <label htmlFor="savePreset" className="text-sm text-gray-300 select-none cursor-pointer">
-                                        Save as preset button
-                                    </label>
-                                </div>
+                                    <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/5">
+                                        <input
+                                            type="checkbox"
+                                            id="savePreset"
+                                            checked={saveAsPreset}
+                                            onChange={(e) => setSaveAsPreset(e.target.checked)}
+                                            className="w-5 h-5 rounded border-gray-600 text-[#2b6cee] focus:ring-[#2b6cee] bg-white/10 cursor-pointer"
+                                        />
+                                        <label htmlFor="savePreset" className="text-sm text-gray-300 select-none cursor-pointer">
+                                            Save as preset button
+                                        </label>
+                                    </div>
 
-                                <div className="grid grid-cols-2 gap-3 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsCustomModalOpen(false)}
-                                        className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={!customAmount}
-                                        className="w-full py-3 rounded-xl bg-[#2b6cee] hover:bg-[#2b6cee]/90 font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#2b6cee]/20"
-                                    >
-                                        Add
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* Daily Goal Modal */}
-                {isGoalModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="bg-[#101622] border border-white/10 w-full max-w-xs rounded-2xl p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
-                            <h3 className="text-lg font-bold text-center mb-2">Set Daily Goal</h3>
-                            <p className="text-center text-gray-400 text-xs mb-6">Enter your target intake in milliliters.</p>
-                            <form onSubmit={handleGoalSubmit} className="space-y-4">
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        autoFocus
-                                        value={tempGoal}
-                                        onChange={(e) => setTempGoal(e.target.value)}
-                                        placeholder="2500"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-center text-2xl font-bold focus:outline-none focus:border-[#2b6cee] focus:ring-1 focus:ring-[#2b6cee] placeholder:text-white/20 text-white transition-all"
-                                    />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">ml</span>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsGoalModalOpen(false)}
-                                        className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={!tempGoal}
-                                        className="w-full py-3 rounded-xl bg-[#2b6cee] hover:bg-[#2b6cee]/90 font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#2b6cee]/20"
-                                    >
-                                        Save
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* Delete Preset Modal */}
-                {isDeleteModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="bg-[#101622] border border-white/10 w-full max-w-xs rounded-2xl p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
-                            <h3 className="text-lg font-bold text-center mb-2">Delete Preset</h3>
-                            <p className="text-center text-gray-400 text-sm mb-6">
-                                Are you sure you want to remove the <span className="text-[#2b6cee] font-bold">{presetToDelete}ml</span> preset?
-                            </p>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    onClick={() => setIsDeleteModalOpen(false)}
-                                    className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={confirmDeletePreset}
-                                    className="w-full py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold transition-colors"
-                                >
-                                    Delete
-                                </button>
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCustomModalOpen(false)}
+                                            className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={!customAmount}
+                                            className="w-full py-3 rounded-xl bg-[#2b6cee] hover:bg-[#2b6cee]/90 font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#2b6cee]/20"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
-        </div>
+                    )
+                }
+
+                {/* Daily Goal Modal */}
+                {
+                    isGoalModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                            <div className="bg-[#101622] border border-white/10 w-full max-w-xs rounded-2xl p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+                                <h3 className="text-lg font-bold text-center mb-2">Set Daily Goal</h3>
+                                <p className="text-center text-gray-400 text-xs mb-6">Enter your target intake in milliliters.</p>
+                                <form onSubmit={handleGoalSubmit} className="space-y-4">
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            autoFocus
+                                            value={tempGoal}
+                                            onChange={(e) => setTempGoal(e.target.value)}
+                                            placeholder="2500"
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-center text-2xl font-bold focus:outline-none focus:border-[#2b6cee] focus:ring-1 focus:ring-[#2b6cee] placeholder:text-white/20 text-white transition-all"
+                                        />
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">ml</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsGoalModalOpen(false)}
+                                            className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={!tempGoal}
+                                            className="w-full py-3 rounded-xl bg-[#2b6cee] hover:bg-[#2b6cee]/90 font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#2b6cee]/20"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Delete Preset Modal */}
+                {
+                    isDeleteModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                            <div className="bg-[#101622] border border-white/10 w-full max-w-xs rounded-2xl p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+                                <h3 className="text-lg font-bold text-center mb-2">Delete Preset</h3>
+                                <p className="text-center text-gray-400 text-sm mb-6">
+                                    Are you sure you want to remove the <span className="text-[#2b6cee] font-bold">{presetToDelete}ml</span> preset?
+                                </p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => setIsDeleteModalOpen(false)}
+                                        className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={confirmDeletePreset}
+                                        className="w-full py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold transition-colors"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+            </div >
+        </div >
     )
 }

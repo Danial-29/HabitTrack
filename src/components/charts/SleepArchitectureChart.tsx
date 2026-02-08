@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 interface SleepArchitectureChartProps {
     data: {
         date: string
@@ -9,6 +11,8 @@ interface SleepArchitectureChartProps {
 }
 
 export default function SleepArchitectureChart({ data }: SleepArchitectureChartProps) {
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+
     if (data.length === 0) {
         return (
             <div className="flex items-center justify-center h-48 text-slate-500 text-sm">
@@ -20,10 +24,23 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
     // Find max time for scaling
     const maxTime = Math.max(...data.map(d => d.totalTimeInBed), 480) // At least 8 hours
 
-    const barHeight = 20
-    const barGap = 8
-    const padding = { top: 20, bottom: 30, left: 10, right: 40 }
-    const chartWidth = 280
+    const barHeight = 24
+    const barGap = 12
+    const padding = { top: 25, bottom: 25, left: 10, right: 35 }
+    const chartWidth = 320
+
+    const formatMinutes = (mins: number) => `${mins} min`
+    const formatTime = (mins: number) => {
+        const h = Math.floor(mins / 60)
+        const m = Math.round(mins % 60)
+        return `${h}h ${m}m`
+    }
+
+    const selectedEntry = selectedIndex !== null ? data[selectedIndex] : null
+
+    const handleBarClick = (index: number) => {
+        setSelectedIndex(prev => prev === index ? null : index)
+    }
 
     return (
         <div className="w-full">
@@ -49,7 +66,7 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
                 {/* Bars */}
                 {data.map((entry, i) => {
                     const y = padding.top + 10 + i * (barHeight + barGap)
-                    const barMaxWidth = chartWidth - padding.left - padding.right - 30
+                    const barMaxWidth = chartWidth - padding.left - padding.right - 25
 
                     const latencyWidth = (entry.latency / maxTime) * barMaxWidth
                     const awakeWidth = (entry.awakeDuration / maxTime) * barMaxWidth
@@ -59,8 +76,14 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
                     const date = new Date(entry.date)
                     const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' }).substring(0, 2)
 
+                    const isSelected = selectedIndex === i
+
                     return (
-                        <g key={entry.date}>
+                        <g
+                            key={entry.date}
+                            onClick={() => handleBarClick(i)}
+                            style={{ cursor: 'pointer' }}
+                        >
                             {/* Day label */}
                             <text
                                 x={padding.left}
@@ -72,6 +95,18 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
 
                             {/* Stacked bars */}
                             <g transform={`translate(${padding.left + 25}, ${y})`}>
+                                {/* Selection highlight */}
+                                {isSelected && (
+                                    <rect
+                                        x={-4}
+                                        y={-4}
+                                        width={latencyWidth + awakeWidth + sleepWidth + 8}
+                                        height={barHeight + 8}
+                                        rx={6}
+                                        className="fill-white/10 stroke-purple-400/50"
+                                        strokeWidth={1.5}
+                                    />
+                                )}
                                 {/* Latency (amber) */}
                                 <rect
                                     x={0}
@@ -103,9 +138,9 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
 
                             {/* Duration label */}
                             <text
-                                x={chartWidth - padding.right + 5}
+                                x={chartWidth - padding.right + 2}
                                 y={y + barHeight / 2 + 4}
-                                className="fill-slate-300 text-[9px] font-semibold"
+                                className="fill-slate-300 text-[10px] font-semibold"
                             >
                                 {Math.floor(entry.totalTimeInBed / 60)}h
                             </text>
@@ -113,6 +148,57 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
                     )
                 })}
             </svg>
+
+            {/* Detail Modal */}
+            {selectedEntry && (
+                <div
+                    className="mt-3 bg-[rgba(25,34,51,0.9)] backdrop-blur-xl border border-white/15 rounded-xl p-4 animate-in slide-in-from-top-2 duration-200"
+                    onClick={() => setSelectedIndex(null)}
+                >
+                    {/* Date Header */}
+                    <div className="text-white font-bold text-sm mb-3 pb-2 border-b border-white/10">
+                        {new Date(selectedEntry.date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'short',
+                            day: 'numeric'
+                        })}
+                    </div>
+
+                    {/* Metrics */}
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="size-3 rounded-sm bg-amber-500/80"></div>
+                                <span className="text-slate-400 text-xs">Fell asleep in</span>
+                            </div>
+                            <span className="text-amber-400 font-semibold text-sm">{formatMinutes(selectedEntry.latency)}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="size-3 rounded-sm bg-red-500/80"></div>
+                                <span className="text-slate-400 text-xs">Awake during night</span>
+                            </div>
+                            <span className="text-red-400 font-semibold text-sm">{formatMinutes(selectedEntry.awakeDuration)}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="size-3 rounded-sm bg-purple-500/80"></div>
+                                <span className="text-slate-400 text-xs">Actual sleep</span>
+                            </div>
+                            <span className="text-purple-400 font-semibold text-sm">{formatTime(selectedEntry.totalSleepTime)}</span>
+                        </div>
+
+                        <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
+                            <span className="text-slate-300 text-xs font-medium">Total time in bed</span>
+                            <span className="text-white font-bold text-sm">{formatTime(selectedEntry.totalTimeInBed)}</span>
+                        </div>
+                    </div>
+
+                    <p className="text-slate-600 text-[10px] text-center mt-3">Tap to dismiss</p>
+                </div>
+            )}
         </div>
     )
 }

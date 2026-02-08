@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import type { HydrationLog, HydrationSettings } from '../lib/database.types'
+import type { HydrationLog, HydrationSettings, Json } from '../lib/database.types'
 
 interface HydrationLogLocal {
     id: string
@@ -9,6 +9,11 @@ interface HydrationLogLocal {
     time: string
     label: string
     logged_at: string
+}
+
+export interface Preset {
+    amount: number
+    label?: string
 }
 
 export function useHydrationData() {
@@ -158,12 +163,12 @@ export function useHydrationData() {
     }
 
     // Update presets
-    const updatePresets = async (presets: number[]) => {
+    const updatePresets = async (presets: Preset[]) => {
         if (!user || !settings) return { error: 'Not authenticated' }
 
         const { error } = await supabase
             .from('hydration_settings')
-            .update({ presets, updated_at: new Date().toISOString() })
+            .update({ presets: presets as unknown as Json, updated_at: new Date().toISOString() })
             .eq('user_id', user.id)
 
         if (error) {
@@ -171,13 +176,29 @@ export function useHydrationData() {
             return { error: error.message }
         }
 
-        setSettings(prev => prev ? { ...prev, presets } : null)
+        setSettings(prev => prev ? { ...prev, presets: presets as unknown as Json } : null)
         return { error: null }
     }
 
     // Calculated values
     const dailyGoal = settings?.daily_goal ?? 2500
-    const presets = settings?.presets ?? [250, 500, 750]
+
+    // Parse presets with backward compatibility (handles both number[] and Preset[])
+    const parsePresets = (): Preset[] => {
+        const raw = settings?.presets
+        if (!raw) return [{ amount: 250 }, { amount: 500 }, { amount: 750 }]
+        if (Array.isArray(raw)) {
+            return raw.map(item => {
+                if (typeof item === 'number') return { amount: item }
+                if (typeof item === 'object' && item !== null && 'amount' in item) {
+                    return { amount: (item as { amount: number }).amount, label: (item as { label?: string }).label }
+                }
+                return { amount: 250 }
+            })
+        }
+        return [{ amount: 250 }, { amount: 500 }, { amount: 750 }]
+    }
+    const presets = parsePresets()
 
     // Today's intake
     const today = new Date().toDateString()
@@ -220,6 +241,195 @@ export function useHydrationData() {
         return stats
     }
 
+    // ═══════════════════════════════════════════
+    // ANALYTICS FUNCTIONS FOR STATS PAGE
+    // ═══════════════════════════════════════════
+
+    // Get daily totals map for a period
+    const getDailyTotalsMap = (days: number) => {
+        const now = new Date()
+        const cutoff = new Date(now)
+        cutoff.setDate(now.getDate() - days)
+        cutoff.setHours(0, 0, 0, 0)
+
+        const dailyTotals: { [key: string]: number } = {}
+        logs.forEach(log => {
+            const logDate = new Date(log.logged_at)
+            if (logDate >= cutoff) {
+                const dateKey = logDate.toDateString()
+                dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + log.amount
+            }
+        })
+        return dailyTotals
+    }
+
+    // Stats for a period (avg intake, consistency, log count)
+    const getStatsForPeriod = (days: number) => {
+        const dailyTotals = getDailyTotalsMap(days)
+        const totals = Object.values(dailyTotals)
+        const logsCount = totals.length
+        const avgIntake = logsCount > 0 ? totals.reduce((a, b) => a + b, 0) / logsCount : 0
+        const daysAtGoal = totals.filter(t => t >= dailyGoal).length
+        const consistency = days > 0 ? (daysAtGoal / days) * 100 : 0
+
+        return { avgIntake, consistency, logsCount, daysAtGoal }
+    }
+
+    // Consistency score (% of days hitting goal)
+    const getConsistencyScore = (days: number) => {
+        const dailyTotals = getDailyTotalsMap(days)
+        const daysAtGoal = Object.values(dailyTotals).filter(t => t >= dailyGoal).length
+        return { score: days > 0 ? (daysAtGoal / days) * 100 : 0, daysAtGoal, totalDays: days }
+    }
+
+    // Hourly distribution (what times of day user drinks)
+    const getHourlyDistribution = () => {
+        const hourlyTotals: number[] = new Array(24).fill(0)
+        const hourlyCounts: number[] = new Array(24).fill(0)
+
+        logs.forEach(log => {
+            const hour = new Date(log.logged_at).getHours()
+            hourlyTotals[hour] += log.amount
+            hourlyCounts[hour] += 1
+        })
+
+        // Find peak hour
+        let peakHour = 0
+        let peakAmount = 0
+        hourlyTotals.forEach((total, hour) => {
+            if (total > peakAmount) {
+                peakAmount = total
+                peakHour = hour
+            }
+        })
+
+        // Group into time periods
+        const morning = hourlyTotals.slice(6, 12).reduce((a, b) => a + b, 0)
+        const afternoon = hourlyTotals.slice(12, 18).reduce((a, b) => a + b, 0)
+        const evening = hourlyTotals.slice(18, 24).reduce((a, b) => a + b, 0)
+        const night = [...hourlyTotals.slice(0, 6), ...hourlyTotals.slice(0, 0)].reduce((a, b) => a + b, 0)
+
+        const total = morning + afternoon + evening + night
+        return {
+            hourlyTotals,
+            hourlyCounts,
+            peakHour,
+            peakAmount,
+            periods: {
+                morning: total > 0 ? (morning / total) * 100 : 0,
+                afternoon: total > 0 ? (afternoon / total) * 100 : 0,
+                evening: total > 0 ? (evening / total) * 100 : 0,
+                night: total > 0 ? (night / total) * 100 : 0,
+            }
+        }
+    }
+
+    // Weekday vs Weekend comparison
+    const getWeekdayVsWeekend = () => {
+        const weekdayTotals: number[] = []
+        const weekendTotals: number[] = []
+        const dailyTotals = getDailyTotalsMap(30)
+
+        Object.entries(dailyTotals).forEach(([dateStr, total]) => {
+            const day = new Date(dateStr).getDay()
+            if (day === 0 || day === 6) {
+                weekendTotals.push(total)
+            } else {
+                weekdayTotals.push(total)
+            }
+        })
+
+        const avgWeekday = weekdayTotals.length > 0 ? weekdayTotals.reduce((a, b) => a + b, 0) / weekdayTotals.length : 0
+        const avgWeekend = weekendTotals.length > 0 ? weekendTotals.reduce((a, b) => a + b, 0) / weekendTotals.length : 0
+
+        return {
+            avgWeekday,
+            avgWeekend,
+            difference: avgWeekend - avgWeekday,
+            weekdayCount: weekdayTotals.length,
+            weekendCount: weekendTotals.length
+        }
+    }
+
+    // Daily trend data for bar chart
+    const getDailyTrendData = (days: number) => {
+        const now = new Date()
+        const data: { date: string; dateLabel: string; total: number; percentage: number }[] = []
+        const dailyTotals = getDailyTotalsMap(days)
+
+        for (let i = days - 1; i >= 0; i--) {
+            const date = new Date(now)
+            date.setDate(now.getDate() - i)
+            const dateKey = date.toDateString()
+            const total = dailyTotals[dateKey] || 0
+            data.push({
+                date: dateKey,
+                dateLabel: date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }),
+                total,
+                percentage: Math.min((total / dailyGoal) * 100, 150) // Cap at 150% for viz
+            })
+        }
+        return data
+    }
+
+    // Streak info (consecutive days hitting goal)
+    const getStreakInfo = () => {
+        const now = new Date()
+        let currentStreak = 0
+        let longestStreak = 0
+        let tempStreak = 0
+
+        // Check from today going back
+        for (let i = 0; i < 365; i++) {
+            const date = new Date(now)
+            date.setDate(now.getDate() - i)
+            const dateKey = date.toDateString()
+
+            const dailyTotal = logs
+                .filter(log => new Date(log.logged_at).toDateString() === dateKey)
+                .reduce((sum, log) => sum + log.amount, 0)
+
+            if (dailyTotal >= dailyGoal) {
+                tempStreak++
+                if (i === currentStreak) {
+                    currentStreak = tempStreak
+                }
+            } else {
+                if (tempStreak > longestStreak) longestStreak = tempStreak
+                tempStreak = 0
+            }
+        }
+
+        if (tempStreak > longestStreak) longestStreak = tempStreak
+
+        return { currentStreak, longestStreak }
+    }
+
+    // Best and worst day of week
+    const getDayOfWeekStats = () => {
+        const dayTotals: { [key: number]: number[] } = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }
+        const dailyTotals = getDailyTotalsMap(30)
+
+        Object.entries(dailyTotals).forEach(([dateStr, total]) => {
+            const day = new Date(dateStr).getDay()
+            dayTotals[day].push(total)
+        })
+
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        const dayAverages = Object.entries(dayTotals).map(([day, totals]) => ({
+            day: Number(day),
+            name: dayNames[Number(day)],
+            avg: totals.length > 0 ? totals.reduce((a, b) => a + b, 0) / totals.length : 0
+        }))
+
+        const sorted = [...dayAverages].sort((a, b) => b.avg - a.avg)
+        return {
+            best: sorted[0],
+            worst: sorted[sorted.length - 1],
+            all: dayAverages
+        }
+    }
+
     return {
         logs,
         todayLogs,
@@ -235,6 +445,14 @@ export function useHydrationData() {
         updateDailyGoal,
         updatePresets,
         getLast7DaysStats,
+        // Analytics for Stats page
+        getStatsForPeriod,
+        getConsistencyScore,
+        getHourlyDistribution,
+        getWeekdayVsWeekend,
+        getDailyTrendData,
+        getStreakInfo,
+        getDayOfWeekStats,
         refetch: fetchData,
     }
 }

@@ -46,12 +46,6 @@ export default function Settings() {
                             <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
                         </div>
                     </div>
-                    <div className={`${glassCardClass} p-4 rounded-xl flex items-center justify-between`}>
-                        <span>Notifications</span>
-                        <div className="w-10 h-6 bg-slate-600 rounded-full relative">
-                            <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full"></div>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Sign Out Button */}

@@ -44,21 +44,21 @@ export interface Database {
                     id: string
                     user_id: string
                     daily_goal: number
-                    presets: number[]
+                    presets: Json // Array of {amount: number, label?: string}
                     updated_at: string
                 }
                 Insert: {
                     id?: string
                     user_id: string
                     daily_goal?: number
-                    presets?: number[]
+                    presets?: Json
                     updated_at?: string
                 }
                 Update: {
                     id?: string
                     user_id?: string
                     daily_goal?: number
-                    presets?: number[]
+                    presets?: Json
                     updated_at?: string
                 }
                 Relationships: []

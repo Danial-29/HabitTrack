@@ -77,11 +77,10 @@ export default function BedtimeQualityHeatmap({ data }: BedtimeQualityHeatmapPro
                 {timeLabels.map((label, i) => {
                     const avg = bucketAverages[i]
 
-
                     return (
                         <div key={label} className="flex items-center gap-3">
                             <span className="text-slate-400 text-xs w-12 font-medium">{label}</span>
-                            <div className="flex-1 h-6 rounded-md overflow-hidden bg-slate-800/50 relative">
+                            <div className="flex-1 h-5 rounded-md overflow-hidden bg-slate-800/50 relative">
                                 {avg !== null ? (
                                     <div
                                         className={`h-full ${getColor(avg)} ${getGlow(avg)} transition-all duration-300`}
@@ -93,7 +92,7 @@ export default function BedtimeQualityHeatmap({ data }: BedtimeQualityHeatmapPro
                                     </div>
                                 )}
                             </div>
-                            <span className={`text-xs font-bold w-8 text-right ${avg === null ? 'text-slate-600' :
+                            <span className={`text-xs font-bold w-10 text-right ${avg === null ? 'text-slate-600' :
                                 avg >= 7 ? 'text-green-400' :
                                     avg >= 5 ? 'text-amber-400' : 'text-red-400'
                                 }`}>
@@ -104,23 +103,23 @@ export default function BedtimeQualityHeatmap({ data }: BedtimeQualityHeatmapPro
                 })}
             </div>
 
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-4 mt-4 text-[9px] text-slate-500">
-                <div className="flex items-center gap-1">
-                    <div className="size-2 rounded-sm bg-red-500/60"></div>
-                    <span>Poor</span>
+            {/* Legend - 2x2 Grid for compact fit */}
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 mt-4 px-1">
+                <div className="flex items-center gap-1.5">
+                    <div className="size-1.5 rounded-full bg-red-500/60"></div>
+                    <span className="text-[8px] text-slate-500 uppercase tracking-tighter font-semibold">Poor</span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <div className="size-2 rounded-sm bg-amber-500/60"></div>
-                    <span>Fair</span>
+                <div className="flex items-center gap-1.5 font-medium">
+                    <div className="size-1.5 rounded-full bg-amber-500/60"></div>
+                    <span className="text-[8px] text-slate-500 uppercase tracking-tighter font-semibold">Fair</span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <div className="size-2 rounded-sm bg-green-500/60"></div>
-                    <span>Good</span>
+                <div className="flex items-center gap-1.5">
+                    <div className="size-1.5 rounded-full bg-green-500/60"></div>
+                    <span className="text-[8px] text-slate-500 uppercase tracking-tighter font-semibold">Good</span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <div className="size-2 rounded-sm bg-green-500"></div>
-                    <span>Great</span>
+                <div className="flex items-center gap-1.5">
+                    <div className="size-1.5 rounded-full bg-green-500"></div>
+                    <span className="text-[8px] text-slate-500 uppercase tracking-tighter font-semibold">Great</span>
                 </div>
             </div>
         </div>
