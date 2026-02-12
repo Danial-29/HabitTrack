@@ -21,14 +21,12 @@ export default function ConsistencyChart({ data }: ConsistencyChartProps) {
     }
 
     // Convert time to minutes, handling overnight sleep
-    const timeToMinutes = (time: string, isWakeUp: boolean = false) => {
+    const timeToMinutes = (time: string) => {
         const [h, m] = time.split(':').map(Number)
         let minutes = h * 60 + m
-        // For sleep times after midnight (before 6 AM), or wake times
-        if (isWakeUp && h < 12) {
-            minutes += 24 * 60 // Next day
-        } else if (!isWakeUp && h < 6) {
-            minutes += 24 * 60 // Late night sleep
+        // If hour is before 4 PM, assume it's next day (relative to 6 PM start)
+        if (h < 16) {
+            minutes += 24 * 60
         }
         return minutes
     }
@@ -44,16 +42,16 @@ export default function ConsistencyChart({ data }: ConsistencyChartProps) {
     // Calculate duration between two times
     const calculateDuration = (lightsOut: string, wakeUp: string) => {
         const start = timeToMinutes(lightsOut)
-        const end = timeToMinutes(wakeUp, true)
+        const end = timeToMinutes(wakeUp)
         const duration = end - start
         const h = Math.floor(duration / 60)
         const m = duration % 60
         return `${h}h ${m}m`
     }
 
-    // Calculate chart bounds (9 PM = 21:00 to 12 PM next day = 36:00 in extended format)
-    const minTime = 20 * 60 // 8 PM
-    const maxTime = 36 * 60 // 12 PM next day (noon)
+    // Calculate chart bounds (6 PM = 18:00 to 2 PM next day = 38:00 in extended format)
+    const minTime = 18 * 60 // 6 PM
+    const maxTime = 38 * 60 // 2 PM next day
     const timeRange = maxTime - minTime
 
     const chartHeight = 200
@@ -62,7 +60,7 @@ export default function ConsistencyChart({ data }: ConsistencyChartProps) {
     const padding = { top: 20, bottom: 30, left: 50, right: 20 }
 
     // Time labels for Y axis
-    const timeLabels = ['8 PM', '10 PM', '12 AM', '2 AM', '4 AM', '6 AM', '8 AM', '10 AM', '12 PM']
+    const timeLabels = ['6 PM', '8 PM', '10 PM', '12 AM', '2 AM', '4 AM', '6 AM', '8 AM', '10 AM', '12 PM', '2 PM']
 
     const selectedEntry = selectedIndex !== null ? data[selectedIndex] : null
 
@@ -107,7 +105,7 @@ export default function ConsistencyChart({ data }: ConsistencyChartProps) {
                 {/* Bars */}
                 {data.map((entry, i) => {
                     const sleepStart = timeToMinutes(entry.lightsOut)
-                    const sleepEnd = timeToMinutes(entry.wakeUp, true)
+                    const sleepEnd = timeToMinutes(entry.wakeUp)
 
                     const y1 = padding.top + ((sleepStart - minTime) / timeRange) * chartHeight
                     const y2 = padding.top + ((sleepEnd - minTime) / timeRange) * chartHeight

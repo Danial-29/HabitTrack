@@ -79,6 +79,56 @@ export default function Stats() {
         return `${sign}${h}h ${m}m`
     }
 
+    // Explanation State
+    const [explanation, setExplanation] = useState<{
+        title: string;
+        formula: string;
+        description: string;
+        variables?: { name: string; definition: string }[]
+    } | null>(null)
+
+    // Metric Explanations
+    const metricExplanations = {
+        quality: {
+            title: "Sleep Quality Score",
+            formula: "(Efficiency × 0.4) + (Feel × 4) + Latency Score + Awake Penalty",
+            description: "A 100-point index combining objective metrics with your subjective experience.",
+            variables: [
+                { name: "Efficiency (40%)", definition: "Sleep efficiency × 0.4. Example: 95% → 38 points." },
+                { name: "Subjective Feel (40%)", definition: "Your quality rating × 4. Example: 8/10 → 32 points." },
+                { name: "Latency Score (10%)", definition: "10-25 min = 10pts, 25-45 min = 5pts, >45 min = 0pts." },
+                { name: "Awake Penalty (10%)", definition: "10 - (awakenings × 2) - (awake mins ÷ 10)." }
+            ]
+        },
+        duration: {
+            title: "Total Sleep Duration",
+            formula: "Time in Bed - (Sleep Latency + Awake Duration)",
+            description: "The net crystalline sleep duration after subtracting all wakeful periods.",
+            variables: [
+                { name: "Sleep Latency", definition: "Minutes spent trying to fall asleep." },
+                { name: "Awake Duration", definition: "Total minutes spent awake during the night." }
+            ]
+        },
+        debt: {
+            title: "Sleep Debt",
+            formula: "∑(Target Hours - Actual Hours)",
+            description: "The accumulated biological need for sleep relative to your personal target.",
+            variables: [
+                { name: "Target Hours", definition: "Personal daily sleep goal (Default: 8 hours)." },
+                { name: "Actual Hours", definition: "Net sleep duration recorded for the period." }
+            ]
+        },
+        consistency: {
+            title: "Sleep Consistency Score",
+            formula: "100 - (Standard Deviation ÷ 1.2)",
+            description: "A measure of how strictly you maintain your bedtime and wake-up times. Higher is better for circadian rhythm.",
+            variables: [
+                { name: "Standard Deviation", definition: "Statistical measure of how much your sleep times vary from your average." },
+                { name: "Social Jetlag", definition: "The difference between your biological clock and social schedule." }
+            ]
+        }
+    }
+
     return (
         <div className="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white antialiased min-h-screen flex flex-col items-center">
             <div className="relative flex min-h-screen w-full flex-col bg-[#101622] overflow-x-hidden max-w-md shadow-2xl bg-[radial-gradient(at_0%_0%,rgba(43,108,238,0.15)_0px,transparent_50%),radial-gradient(at_100%_100%,rgba(147,51,234,0.1)_0px,transparent_50%)]">
@@ -321,7 +371,10 @@ export default function Stats() {
                                     ═══════════════════════════════════════════ */}
                                     <div className="grid grid-cols-2 gap-3">
                                         {/* Avg Quality */}
-                                        <div className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-xl p-4">
+                                        <button
+                                            onClick={() => setExplanation(metricExplanations.quality)}
+                                            className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-xl p-4 text-left transition-all hover:bg-white/5 disabled:opacity-50 active:scale-95 cursor-pointer"
+                                        >
                                             <div className="flex items-center gap-2 mb-2">
                                                 <TrendingUp size={14} className="text-purple-400" />
                                                 <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Avg Quality</span>
@@ -330,10 +383,13 @@ export default function Stats() {
                                                 {periodStats.logsCount > 0 ? `${Math.round(periodStats.avgQuality)}` : '--'}
                                                 <span className="text-slate-400 text-sm font-normal">/100</span>
                                             </div>
-                                        </div>
+                                        </button>
 
                                         {/* Avg Duration */}
-                                        <div className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-xl p-4">
+                                        <button
+                                            onClick={() => setExplanation(metricExplanations.duration)}
+                                            className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-xl p-4 text-left transition-all hover:bg-white/5 disabled:opacity-50 active:scale-95 cursor-pointer"
+                                        >
                                             <div className="flex items-center gap-2 mb-2">
                                                 <Clock size={14} className="text-blue-400" />
                                                 <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Avg Duration</span>
@@ -341,10 +397,13 @@ export default function Stats() {
                                             <div className="text-white text-2xl font-bold">
                                                 {periodStats.logsCount > 0 ? formatDuration(periodStats.avgDuration) : '--'}
                                             </div>
-                                        </div>
+                                        </button>
 
                                         {/* Sleep Debt */}
-                                        <div className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-xl p-4">
+                                        <button
+                                            onClick={() => setExplanation(metricExplanations.debt)}
+                                            className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-xl p-4 text-left transition-all hover:bg-white/5 disabled:opacity-50 active:scale-95 cursor-pointer"
+                                        >
                                             <div className="flex items-center gap-2 mb-2">
                                                 <AlertTriangle size={14} className={periodStats.totalSleepDebt > 0 ? 'text-red-400' : 'text-green-400'} />
                                                 <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Sleep Debt</span>
@@ -352,10 +411,13 @@ export default function Stats() {
                                             <div className={`text-2xl font-bold ${periodStats.totalSleepDebt > 0 ? 'text-red-400' : 'text-green-400'}`}>
                                                 {periodStats.logsCount > 0 ? formatDebt(periodStats.totalSleepDebt) : '--'}
                                             </div>
-                                        </div>
+                                        </button>
 
                                         {/* Consistency Score */}
-                                        <div className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-xl p-4">
+                                        <button
+                                            onClick={() => setExplanation(metricExplanations.consistency)}
+                                            className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-xl p-4 text-left transition-all hover:bg-white/5 disabled:opacity-50 active:scale-95 cursor-pointer"
+                                        >
                                             <div className="flex items-center gap-2 mb-2">
                                                 <Activity size={14} className="text-amber-400" />
                                                 <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Consistency</span>
@@ -364,7 +426,7 @@ export default function Stats() {
                                                 {Math.round(consistencyData.score)}
                                                 <span className="text-slate-400 text-sm font-normal">%</span>
                                             </div>
-                                        </div>
+                                        </button>
                                     </div>
 
                                     {/* ═══════════════════════════════════════════
@@ -399,6 +461,47 @@ export default function Stats() {
                                         <QualityVsDurationChart data={qualityDurationData} />
                                     </div>
 
+                                    {/* Explanation Modal */}
+                                    {explanation && (
+                                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setExplanation(null)}>
+                                            <div
+                                                className="bg-[#101622] border border-white/10 w-full max-w-sm rounded-2xl p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <h3 className="text-lg font-bold mb-2 text-purple-400">{explanation.title}</h3>
+
+                                                <p className="text-sm text-slate-300 leading-relaxed italic opacity-80 mb-4">
+                                                    {explanation.description}
+                                                </p>
+
+                                                <div className="bg-white/5 rounded-xl p-3 border border-white/5 mb-6">
+                                                    <p className="text-[10px] text-slate-400 uppercase font-bold mb-1.5 tracking-tighter opacity-60">Calculation Formula</p>
+                                                    <code className="text-[13px] font-mono text-emerald-400 break-words leading-relaxed">{explanation.formula}</code>
+                                                </div>
+
+                                                {explanation.variables && (
+                                                    <div className="space-y-4">
+                                                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter opacity-60">Variables & Definitions</p>
+                                                        <div className="space-y-3">
+                                                            {explanation.variables.map((v, i) => (
+                                                                <div key={i} className="border-l-2 border-purple-500/30 pl-3">
+                                                                    <p className="text-xs font-bold text-white mb-0.5">{v.name}</p>
+                                                                    <p className="text-[11px] text-slate-400 leading-normal">{v.definition}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <button
+                                                    onClick={() => setExplanation(null)}
+                                                    className="w-full mt-8 py-3 rounded-xl bg-purple-600/10 hover:bg-purple-600/20 text-purple-400 font-bold transition-all border border-purple-500/20"
+                                                >
+                                                    Got it
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                     {/* ═══════════════════════════════════════════
                                         ADVANCED INSIGHTS
                                     ═══════════════════════════════════════════ */}

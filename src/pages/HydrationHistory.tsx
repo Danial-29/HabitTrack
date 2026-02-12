@@ -1,12 +1,13 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Droplet, Loader2 } from 'lucide-react'
+import { ChevronLeft, Droplet, Loader2, X } from 'lucide-react'
 import { useHydrationData } from '../hooks/useHydrationData'
 
 interface DayGroup {
     date: Date
     total: number
     percentage: number
-    logs: { id: string; amount: number; time: string; label: string }[]
+    logs: { id: string; amount: number; time: string; label: string; logged_at: string }[]
 }
 
 interface MonthGroup {
@@ -21,6 +22,7 @@ interface MonthGroup {
 export default function HydrationHistory() {
     const navigate = useNavigate()
     const { allLogs, dailyGoal, loading } = useHydrationData()
+    const [selectedDay, setSelectedDay] = useState<DayGroup | null>(null)
 
     // Process logs into month groups
     const getHistory = (): MonthGroup[] => {
@@ -142,7 +144,11 @@ export default function HydrationHistory() {
                                         const isToday = new Date().toDateString() === day.date.toDateString()
 
                                         return (
-                                            <div key={day.date.toISOString()} className={`${glassCardClass} rounded-xl p-4 flex items-center gap-4 group hover:bg-white/5 transition-colors`}>
+                                            <div
+                                                key={day.date.toISOString()}
+                                                onClick={() => setSelectedDay(day)}
+                                                className={`${glassCardClass} rounded-xl p-4 flex items-center gap-4 group hover:bg-white/5 transition-colors cursor-pointer active:scale-[0.98] duration-200`}
+                                            >
                                                 {/* Date Column */}
                                                 <div className="w-16 flex flex-col items-center justify-center border-r border-white/10 pr-4">
                                                     <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
@@ -185,6 +191,64 @@ export default function HydrationHistory() {
                     )}
                 </div>
             </div>
+
+            {/* Day Detail Modal */}
+            {selectedDay && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[#101622] border border-white/10 w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl scale-100 animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
+
+                        {/* Modal Header */}
+                        <div className="p-5 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#101622] z-10">
+                            <div>
+                                <h3 className="text-lg font-bold">
+                                    {selectedDay.date.toLocaleDateString('default', { month: 'long', day: 'numeric' })}
+                                </h3>
+                                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                                    {selectedDay.total}ml Total • {selectedDay.percentage}% Goal
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedDay(null)}
+                                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                            >
+                                <X size={20} className="text-gray-400" />
+                            </button>
+                        </div>
+
+                        {/* Logs List */}
+                        <div className="p-5 overflow-y-auto space-y-3">
+                            {selectedDay.logs.length === 0 ? (
+                                <p className="text-gray-500 text-center py-4 text-sm">No logs recorded.</p>
+                            ) : (
+                                selectedDay.logs.sort((a, b) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime()).map((log) => (
+                                    <div key={log.id} className={`${glassCardClass} rounded-xl p-4 flex items-center justify-between`}>
+                                        <div className="flex items-center gap-4">
+                                            <div className="size-10 rounded-lg bg-[#2b6cee]/10 flex items-center justify-center">
+                                                <Droplet className="text-[#2b6cee]" size={20} fill="currentColor" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-sm">{log.label || 'Water'}</p>
+                                                <p className="text-xs text-gray-500">{new Date(log.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                            </div>
+                                        </div>
+                                        <p className="font-bold text-[#2b6cee]">{log.amount}ml</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-5 pt-2 border-t border-white/5 bg-[#101622]">
+                            <button
+                                onClick={() => setSelectedDay(null)}
+                                className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-colors text-sm"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
