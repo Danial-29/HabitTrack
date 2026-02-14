@@ -7,7 +7,7 @@ interface DayGroup {
     date: Date
     total: number
     percentage: number
-    logs: { id: string; amount: number; time: string; label: string; logged_at: string }[]
+    logs: { id: string; amount: number; time: string; label: string; logged_at: string; completed_at: string | null }[]
 }
 
 interface MonthGroup {
@@ -228,7 +228,20 @@ export default function HydrationHistory() {
                                             </div>
                                             <div>
                                                 <p className="font-bold text-sm">{log.label || 'Water'}</p>
-                                                <p className="text-xs text-gray-500">{new Date(log.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                <p className="text-xs text-gray-500">
+                                                    {(() => {
+                                                        const startTime = new Date(log.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+                                                        // If completed_at exists and is different from logged_at (active drink finished)
+                                                        if (log.completed_at && log.completed_at !== log.logged_at) {
+                                                            const endTime = new Date(log.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                            if (startTime !== endTime) {
+                                                                return `${startTime} - ${endTime}`
+                                                            }
+                                                        }
+                                                        return startTime
+                                                    })()}
+                                                </p>
                                             </div>
                                         </div>
                                         <p className="font-bold text-[#2b6cee]">{log.amount}ml</p>

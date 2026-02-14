@@ -12,10 +12,12 @@ export default function Dashboard() {
         todayIntake,
         yesterdayIntake,
         dailyGoal,
+        getDailyTrendData,
         loading: hydrationLoading
     } = useHydrationData()
 
     const waterProgress = Math.min(100, (todayIntake / dailyGoal) * 100)
+    const hydrationTrend = getDailyTrendData(7) // Get last 7 days (Oldest -> Newest)
 
     // --- Sleep Data (from Supabase) ---
     const { logs: sleepLogs, latestStats, calculateStats, loading: sleepLoading } = useSleepData()
@@ -106,8 +108,31 @@ export default function Dashboard() {
                                     ></div>
                                 </div>
                                 <div className="flex justify-between items-center mt-1">
-                                    <div className="text-slate-300 text-sm font-medium">{(todayIntake / 1000).toFixed(1)}L / {(dailyGoal / 1000).toFixed(1)}L ({Math.round(waterProgress)}%)</div>
+                                    <div className="text-slate-300 text-sm font-medium">{(todayIntake / 1000).toFixed(1)}L / {(dailyGoal / 1000).toFixed(1)}L <span className="text-xs text-slate-500 ml-1">({Math.round(waterProgress)}%)</span></div>
                                 </div>
+                            </div>
+
+                            {/* Mini Heatmap */}
+                            <div className="flex justify-between items-center gap-1 mt-2 pt-3 border-t border-white/5 z-10">
+                                {hydrationTrend.map((day, i) => {
+                                    const isGoalMet = day.percentage >= 100
+                                    const isToday = i === hydrationTrend.length - 1
+                                    const dateObj = new Date(day.date)
+                                    // Properly get weekday initial (Sunday = S, Monday = M, etc)
+                                    const dayInitial = ['S', 'M', 'T', 'W', 'T', 'F', 'S'][dateObj.getDay()]
+
+                                    return (
+                                        <div key={i} className="flex flex-col items-center gap-1 flex-1">
+                                            <div
+                                                className={`w-full aspect-square rounded-md transition-all duration-300 ${isGoalMet
+                                                    ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]'
+                                                    : 'bg-white/5 border border-white/5'
+                                                    } ${isToday ? 'ring-1 ring-white' : ''}`}
+                                            ></div>
+                                            <span className={`text-[9px] font-bold uppercase ${isToday ? 'text-white' : 'text-slate-500'}`}>{dayInitial}</span>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         </div>
                     </Link>

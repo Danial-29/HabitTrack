@@ -9,6 +9,7 @@ interface HydrationLogLocal {
     time: string
     label: string
     logged_at: string
+    completed_at: string | null
 }
 
 export interface Preset {
@@ -52,6 +53,7 @@ export function useHydrationData() {
                 time: new Date(log.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 label: log.label,
                 logged_at: log.logged_at,
+                completed_at: log.completed_at,
             }))
 
             setLogs(transformedLogs)
@@ -93,8 +95,8 @@ export function useHydrationData() {
         fetchData()
     }, [fetchData])
 
-    // Add a new log
-    const addLog = async (amount: number, label: string = 'Quick Add') => {
+    // Start a new drink (active)
+    const startDrink = async (amount: number, label: string = 'Active Drink') => {
         if (!user) return { error: 'Not authenticated' }
 
         const { data, error } = await supabase
@@ -103,6 +105,42 @@ export function useHydrationData() {
                 user_id: user.id,
                 amount,
                 label,
+                completed_at: null, // Explicitly null for active
+            })
+            .select()
+            .single()
+
+        if (error) {
+            console.error('Error starting drink:', error)
+            return { error: error.message }
+        }
+
+        // Add to local state
+        const newLog: HydrationLogLocal = {
+            id: data.id,
+            amount: data.amount,
+            time: new Date(data.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            label: data.label,
+            logged_at: data.logged_at,
+            completed_at: null,
+        }
+        setLogs(prev => [newLog, ...prev])
+
+        return { error: null }
+    }
+
+    // Add a completed log directly (history)
+    const addLog = async (amount: number, label: string = 'Quick Add') => {
+        if (!user) return { error: 'Not authenticated' }
+
+        const now = new Date().toISOString()
+        const { data, error } = await supabase
+            .from('hydration_logs')
+            .insert({
+                user_id: user.id,
+                amount,
+                label,
+                completed_at: now, // Immediately completed
             })
             .select()
             .single()
@@ -119,9 +157,32 @@ export function useHydrationData() {
             time: new Date(data.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             label: data.label,
             logged_at: data.logged_at,
+            completed_at: now,
         }
         setLogs(prev => [newLog, ...prev])
 
+        return { error: null }
+    }
+
+    // Finish a drink
+    const finishDrink = async (id: string) => {
+        if (!user) return { error: 'Not authenticated' }
+
+        const now = new Date().toISOString()
+        const { error } = await supabase
+            .from('hydration_logs')
+            .update({ completed_at: now })
+            .eq('id', id)
+            .eq('user_id', user.id)
+
+        if (error) {
+            console.error('Error finishing drink:', error)
+            return { error: error.message }
+        }
+
+        setLogs(prev => prev.map(log =>
+            log.id === id ? { ...log, completed_at: now } : log
+        ))
         return { error: null }
     }
 
@@ -203,8 +264,18 @@ export function useHydrationData() {
     // Today's intake
     const today = new Date().toDateString()
     const todayIntake = logs.reduce((sum, log) => {
-        const logDate = new Date(log.logged_at).toDateString()
-        return logDate === today ? sum + log.amount : sum
+        // Only count COMPLETED logs
+        if (!log.completed_at) return sum
+
+        const logDate = new Date(log.completed_at).toDateString() // Use completed_at for attribution? Or logged_at?
+        // Let's stick to logged_at for date attribution for now, but ensure it IS completed.
+        // Actually, for stats, we usually care when it was CONSUMED.
+        // If I start at 11pm and finish at 1am... it should count for... probably the finish day?
+        // For simplicity and consistency with old logs where completed_at = logged_at:
+        // modifying to check completed_at is NOT NULL.
+
+        const attributionDate = new Date(log.logged_at).toDateString()
+        return attributionDate === today ? sum + log.amount : sum
     }, 0)
 
     // Yesterday's intake
@@ -215,7 +286,13 @@ export function useHydrationData() {
     }, 0)
 
     // Today's logs only
+    // Today's logs only
     const todayLogs = logs.filter(log => new Date(log.logged_at).toDateString() === today)
+
+    // Separate active and history
+    const activeLogs = logs.filter(log => !log.completed_at)
+    // History logs are completed ones
+    const historyLogs = logs.filter(log => !!log.completed_at)
 
     // Weekly stats
     const getLast7DaysStats = () => {
@@ -431,7 +508,8 @@ export function useHydrationData() {
     }
 
     return {
-        logs,
+        logs: historyLogs, // Maintain backward compat for history views
+        activeLogs,
         todayLogs,
         allLogs: logs,
         loading,
@@ -441,6 +519,8 @@ export function useHydrationData() {
         todayIntake,
         yesterdayIntake,
         addLog,
+        startDrink,
+        finishDrink,
         deleteLog,
         updateDailyGoal,
         updatePresets,

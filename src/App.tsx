@@ -8,6 +8,7 @@ import Habits from './pages/Habits'
 import Settings from './pages/Settings'
 import Stats from './pages/Stats'
 import HydrationHistory from './pages/HydrationHistory'
+import HydrationHeatmap from './pages/HydrationHeatmap'
 import Auth from './pages/Auth'
 
 export default function App() {
@@ -32,6 +33,11 @@ export default function App() {
           <Route path="/hydration/history" element={
             <ProtectedRoute>
               <HydrationHistory />
+            </ProtectedRoute>
+          } />
+          <Route path="/hydration/heatmap" element={
+            <ProtectedRoute>
+              <HydrationHeatmap />
             </ProtectedRoute>
           } />
           <Route path="/sleep" element={

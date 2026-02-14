@@ -19,6 +19,7 @@ export interface Database {
                     amount: number
                     label: string
                     logged_at: string
+                    completed_at: string | null
                     created_at: string
                 }
                 Insert: {
@@ -27,6 +28,7 @@ export interface Database {
                     amount: number
                     label?: string
                     logged_at?: string
+                    completed_at?: string | null
                     created_at?: string
                 }
                 Update: {
@@ -35,6 +37,7 @@ export interface Database {
                     amount?: number
                     label?: string
                     logged_at?: string
+                    completed_at?: string | null
                     created_at?: string
                 }
                 Relationships: []

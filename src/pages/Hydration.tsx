@@ -6,7 +6,10 @@ import {
     Droplet,
     Trash2,
     Edit2,
-    Loader2
+    Loader2,
+    Timer,
+    Check,
+    Grid
 } from 'lucide-react'
 import { useHydrationData } from '../hooks/useHydrationData'
 import type { Preset } from '../hooks/useHydrationData'
@@ -20,6 +23,8 @@ export default function Hydration() {
     const [saveAsPreset, setSaveAsPreset] = useState(false)
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
     const [presetToDelete, setPresetToDelete] = useState<number | null>(null)
+
+    const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null)
     const [tempGoal, setTempGoal] = useState('')
 
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -32,7 +37,10 @@ export default function Hydration() {
         dailyGoal,
         presets: quickButtons,
         todayIntake: intake,
+        activeLogs,
         addLog,
+        startDrink,
+        finishDrink,
         deleteLog,
         updateDailyGoal,
         updatePresets,
@@ -67,10 +75,24 @@ export default function Hydration() {
             clearTimeout(timerRef.current)
         }
         if (!isLongPress.current) {
-            const label = preset.label || `${preset.amount}ml Serving`
-            await addIntake(preset.amount, label)
+            // Open choice modal instead of immediate add
+            setSelectedPreset(preset)
         }
         isLongPress.current = false
+    }
+
+    const handlePresetAction = async (action: 'add' | 'start') => {
+        if (!selectedPreset) return
+
+        const label = selectedPreset.label || `${selectedPreset.amount}ml Serving`
+
+        if (action === 'add') {
+            await addIntake(selectedPreset.amount, label)
+        } else {
+            await startDrink(selectedPreset.amount, label)
+        }
+
+        setSelectedPreset(null)
     }
 
     const handlePressCancel = () => {
@@ -115,6 +137,18 @@ export default function Hydration() {
         }
     }
 
+    const handleStartCustomDrink = async () => {
+        const amount = Number(customAmount)
+        if (amount > 0) {
+            const label = customLabel.trim() || 'Active Drink'
+            await startDrink(amount, label)
+            setCustomAmount('')
+            setCustomLabel('')
+            setSaveAsPreset(false)
+            setIsCustomModalOpen(false)
+        }
+    }
+
     const handleGoalSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         const target = Number(tempGoal)
@@ -147,9 +181,12 @@ export default function Hydration() {
                         <ChevronLeft className="text-white" size={24} />
                     </button>
                     <h1 className="text-xl font-bold tracking-tight">Hydration</h1>
-                    <div className="size-10 flex items-center justify-center">
-                        {loading && <Loader2 className="animate-spin text-primary" size={20} />}
-                    </div>
+                    <button
+                        onClick={() => navigate('/hydration/heatmap')}
+                        className={`flex items-center justify-center size-10 rounded-xl ${glassCardClass} hover:bg-white/10 transition-colors`}
+                    >
+                        <Grid size={20} className="text-white" />
+                    </button>
                 </header>
 
                 {/* Weekly Progress Mini Chart */}
@@ -174,6 +211,43 @@ export default function Hydration() {
                         </div>
                     </div>
                 </div>
+
+                {/* Active Drinks Section */}
+                {activeLogs && activeLogs.length > 0 && (
+                    <div className="px-6 mb-6">
+                        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Active Drinks</h3>
+                        <div className="space-y-3">
+                            {activeLogs.map(log => (
+                                <div key={log.id} className={`${glassCardClass} rounded-xl p-4 flex items-center justify-between border-l-4 border-l-[#2b6cee]`}>
+                                    <div className="flex items-center gap-4">
+                                        <div className="size-10 rounded-lg bg-[#2b6cee]/10 flex items-center justify-center animate-pulse">
+                                            <Timer className="text-[#2b6cee]" size={20} />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-sm">{log.label || 'Drinking...'}</p>
+                                            <p className="text-xs text-[#2b6cee] font-medium">Started {log.time}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <p className="font-bold text-2xl">{log.amount}<span className="text-sm text-gray-500 ml-0.5">ml</span></p>
+                                        <button
+                                            onClick={() => finishDrink(log.id)}
+                                            className="size-10 rounded-full bg-[#2b6cee] hover:bg-[#2b6cee]/90 flex items-center justify-center text-white transition-all active:scale-95 shadow-lg shadow-[#2b6cee]/20"
+                                        >
+                                            <Check size={20} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteLog(log.id)}
+                                            className="size-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 transition-all active:scale-95"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Central Water Visual */}
                 <div className="flex flex-col items-center justify-center py-4 relative">
@@ -264,7 +338,20 @@ export default function Hydration() {
                                     </div>
                                     <div>
                                         <p className="font-bold text-sm">{log.label}</p>
-                                        <p className="text-xs text-gray-500">{log.time}</p>
+                                        <p className="text-xs text-gray-500">
+                                            {log.completed_at ? (() => {
+                                                if (log.completed_at === (log.logged_at)) return log.time // Backwards compat for old logs
+
+                                                const startTime = new Date(log.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                const endTime = new Date(log.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+                                                // If differ by more than a minute, show range
+                                                if (startTime !== endTime) {
+                                                    return `${startTime} - ${endTime}`
+                                                }
+                                                return startTime
+                                            })() : log.time}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
@@ -324,17 +411,18 @@ export default function Hydration() {
                                     <div className="grid grid-cols-2 gap-3 pt-2">
                                         <button
                                             type="button"
-                                            onClick={() => setIsCustomModalOpen(false)}
-                                            className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 font-bold transition-colors"
+                                            onClick={handleStartCustomDrink}
+                                            disabled={!customAmount}
+                                            className="w-full py-3 rounded-xl bg-[#2b6cee]/20 hover:bg-[#2b6cee]/30 text-[#2b6cee] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-[#2b6cee]/30"
                                         >
-                                            Cancel
+                                            Start Tracking
                                         </button>
                                         <button
                                             type="submit"
                                             disabled={!customAmount}
                                             className="w-full py-3 rounded-xl bg-[#2b6cee] hover:bg-[#2b6cee]/90 font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#2b6cee]/20"
                                         >
-                                            Add
+                                            Add Now
                                         </button>
                                     </div>
                                 </form>
@@ -406,6 +494,43 @@ export default function Hydration() {
                                         className="w-full py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold transition-colors"
                                     >
                                         Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Preset Action Modal */}
+                {
+                    selectedPreset && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                            <div className="bg-[#101622] border border-white/10 w-full max-w-xs rounded-2xl p-6 shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+                                <h3 className="text-lg font-bold text-center mb-1">{selectedPreset.label || 'Quick Add'}</h3>
+                                <p className="text-center text-[#2b6cee] font-bold text-2xl mb-6">{selectedPreset.amount}ml</p>
+
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={() => handlePresetAction('add')}
+                                        className="w-full py-4 rounded-xl bg-[#2b6cee] hover:bg-[#2b6cee]/90 font-bold transition-colors shadow-lg shadow-[#2b6cee]/20 flex items-center justify-center gap-2"
+                                    >
+                                        <PlusCircle size={20} />
+                                        Add Now
+                                    </button>
+
+                                    <button
+                                        onClick={() => handlePresetAction('start')}
+                                        className="w-full py-4 rounded-xl bg-[#2b6cee]/10 hover:bg-[#2b6cee]/20 text-[#2b6cee] font-bold transition-colors border border-[#2b6cee]/30 flex items-center justify-center gap-2"
+                                    >
+                                        <Timer size={20} />
+                                        Start Tracking
+                                    </button>
+
+                                    <button
+                                        onClick={() => setSelectedPreset(null)}
+                                        className="w-full py-3 rounded-xl bg-transparent hover:bg-white/5 text-gray-400 font-medium transition-colors text-sm mt-2"
+                                    >
+                                        Cancel
                                     </button>
                                 </div>
                             </div>
