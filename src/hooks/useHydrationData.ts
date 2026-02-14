@@ -267,12 +267,7 @@ export function useHydrationData() {
         // Only count COMPLETED logs
         if (!log.completed_at) return sum
 
-        const logDate = new Date(log.completed_at).toDateString() // Use completed_at for attribution? Or logged_at?
-        // Let's stick to logged_at for date attribution for now, but ensure it IS completed.
-        // Actually, for stats, we usually care when it was CONSUMED.
-        // If I start at 11pm and finish at 1am... it should count for... probably the finish day?
-        // For simplicity and consistency with old logs where completed_at = logged_at:
-        // modifying to check completed_at is NOT NULL.
+        // We use logged_at for date attribution to stay consistent with how entries are created on the dashboard
 
         const attributionDate = new Date(log.logged_at).toDateString()
         return attributionDate === today ? sum + log.amount : sum
