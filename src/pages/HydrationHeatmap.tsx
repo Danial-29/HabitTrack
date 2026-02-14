@@ -107,10 +107,12 @@ export default function HydrationHeatmap() {
                                                 }
                                             }
 
+                                            const isToday = dayDate.toDateString() === new Date().toDateString()
+
                                             return (
                                                 <div
                                                     key={dIdx}
-                                                    className={`aspect-square rounded-lg flex items-center justify-center text-[10px] font-bold transition-all hover:scale-110 relative group ${bgClass} ${textClass} ${shadowClass}`}
+                                                    className={`aspect-square rounded-lg flex items-center justify-center text-[10px] font-bold transition-all hover:scale-110 relative group ${bgClass} ${textClass} ${shadowClass} ${isToday ? 'ring-1 ring-white' : ''}`}
                                                 >
                                                     {dayDate.getDate()}
 

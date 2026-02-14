@@ -113,21 +113,37 @@ export default function Dashboard() {
                             </div>
 
                             {/* Mini Heatmap */}
-                            <div className="flex justify-between items-center gap-1 mt-2 pt-3 border-t border-white/5 z-10">
+                            <div
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    window.location.href = '/hydration/heatmap'
+                                }}
+                                className="flex justify-between items-center gap-1 mt-2 pt-3 border-t border-white/5 z-10 cursor-pointer hover:opacity-80 transition-opacity"
+                            >
                                 {hydrationTrend.map((day, i) => {
-                                    const isGoalMet = day.percentage >= 100
+                                    const percentage = day.percentage
                                     const isToday = i === hydrationTrend.length - 1
                                     const dateObj = new Date(day.date)
-                                    // Properly get weekday initial (Sunday = S, Monday = M, etc)
                                     const dayInitial = ['S', 'M', 'T', 'W', 'T', 'F', 'S'][dateObj.getDay()]
+
+                                    let bgClass = 'bg-white/5 border border-white/5'
+                                    let shadowClass = ''
+
+                                    if (day.total > 0) {
+                                        if (percentage >= 100) {
+                                            bgClass = 'bg-blue-500'
+                                            shadowClass = 'shadow-[0_0_8px_rgba(59,130,246,0.6)]'
+                                        } else if (percentage >= 50) {
+                                            bgClass = 'bg-blue-500/50 border-blue-500/20'
+                                        } else {
+                                            bgClass = 'bg-blue-500/20 border-blue-500/10'
+                                        }
+                                    }
 
                                     return (
                                         <div key={i} className="flex flex-col items-center gap-1 flex-1">
                                             <div
-                                                className={`w-full aspect-square rounded-md transition-all duration-300 ${isGoalMet
-                                                    ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]'
-                                                    : 'bg-white/5 border border-white/5'
-                                                    } ${isToday ? 'ring-1 ring-white' : ''}`}
+                                                className={`w-full aspect-square rounded-md transition-all duration-300 ${bgClass} ${shadowClass} ${isToday ? 'ring-1 ring-white' : ''}`}
                                             ></div>
                                             <span className={`text-[9px] font-bold uppercase ${isToday ? 'text-white' : 'text-slate-500'}`}>{dayInitial}</span>
                                         </div>

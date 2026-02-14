@@ -477,6 +477,39 @@ export function useHydrationData() {
         return { currentStreak, longestStreak }
     }
 
+    // Average drink duration by label/container
+    const getAverageDrinkDurationByLabel = () => {
+        const durationMap: { [label: string]: { totalMinutes: number; count: number } } = {}
+
+        logs.forEach(log => {
+            // Only count logs that have a completed_at time
+            if (!log.completed_at) return
+
+            const start = new Date(log.logged_at).getTime()
+            const end = new Date(log.completed_at).getTime()
+            const durationMinutes = (end - start) / (1000 * 60)
+
+            // Filter out "Quick Add" entries (arbitrary threshold < 2 mins)
+            // Real drinks take time. Quick adds are usually instant.
+            if (durationMinutes < 2) return
+
+            if (!durationMap[log.label]) {
+                durationMap[log.label] = { totalMinutes: 0, count: 0 }
+            }
+
+            durationMap[log.label].totalMinutes += durationMinutes
+            durationMap[log.label].count += 1
+        })
+
+        return Object.entries(durationMap)
+            .map(([label, data]) => ({
+                label,
+                avgMinutes: Math.round(data.totalMinutes / data.count),
+                count: data.count
+            }))
+            .sort((a, b) => b.count - a.count) // Sort by most frequent
+    }
+
     // Best and worst day of week
     const getDayOfWeekStats = () => {
         const dayTotals: { [key: number]: number[] } = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }
@@ -528,6 +561,7 @@ export function useHydrationData() {
         getDailyTrendData,
         getStreakInfo,
         getDayOfWeekStats,
+        getAverageDrinkDurationByLabel,
         refetch: fetchData,
     }
 }

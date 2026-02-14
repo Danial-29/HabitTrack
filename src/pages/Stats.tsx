@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Droplets, Moon, Grid, BarChart2, TrendingUp, Clock, AlertTriangle, Activity, Loader2, Flame } from 'lucide-react'
+import { ArrowLeft, Droplets, Moon, Grid, BarChart2, TrendingUp, Clock, AlertTriangle, Activity, Loader2, Flame, Timer } from 'lucide-react'
 import { useSleepData } from '../hooks/useSleepData'
 import { useHydrationData } from '../hooks/useHydrationData'
 import ConsistencyChart from '../components/charts/ConsistencyChart'
@@ -42,6 +42,7 @@ export default function Stats() {
         getDailyTrendData,
         getStreakInfo,
         getDayOfWeekStats,
+        getAverageDrinkDurationByLabel,
     } = useHydrationData()
 
     // Calculate sleep stats
@@ -63,6 +64,7 @@ export default function Stats() {
     const trendData = getDailyTrendData(periodDays)
     const streakInfo = getStreakInfo()
     const dayOfWeekStats = getDayOfWeekStats()
+    const drinkDurations = getAverageDrinkDurationByLabel()
 
     // Format helpers
     const formatDuration = (minutes: number) => {
@@ -333,6 +335,39 @@ export default function Stats() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* ═══════════════════════════════════════════
+                                        DRINK DURATION BY CONTAINER
+                                    ═══════════════════════════════════════════ */}
+                                    {drinkDurations.length > 0 && (
+                                        <div className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-2xl p-4">
+                                            <h3 className="text-white font-bold text-sm mb-1">Drink Speeds</h3>
+                                            <p className="text-slate-400 text-xs mb-4">Average time to finish by container</p>
+
+                                            <div className="grid grid-cols-1 gap-3">
+                                                {drinkDurations.map((item) => (
+                                                    <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                                                        <div className="size-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                                                            <Timer size={16} />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs text-slate-400 truncate mb-0.5">{item.label}</p>
+                                                            <div className="flex items-baseline gap-1.5">
+                                                                <span className="text-lg font-bold text-white">
+                                                                    {item.avgMinutes >= 60
+                                                                        ? `${Math.floor(item.avgMinutes / 60)}h ${item.avgMinutes % 60}m`
+                                                                        : `${item.avgMinutes}m`}
+                                                                </span>
+                                                                <span className="text-[10px] text-slate-500">
+                                                                    ({item.count})
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
