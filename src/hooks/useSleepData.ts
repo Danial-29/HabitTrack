@@ -211,6 +211,63 @@ export const useSleepData = () => {
         return { error: null }
     }
 
+    // Update an existing log
+    const updateLog = async (id: string, entry: Omit<SleepLog, 'id' | 'date'>) => {
+        if (!user) return { error: 'Not authenticated' }
+
+        const logToUpdate = logs.find(l => l.id === id)
+        if (!logToUpdate) return { error: 'Log not found' }
+
+        const stats = calculateStats({
+            ...entry,
+            id,
+            date: logToUpdate.date
+        })
+
+        const { data, error } = await supabase
+            .from('sleep_logs')
+            .update({
+                lights_out: entry.lightsOut,
+                wake_up: entry.wakeUp,
+                out_of_bed: entry.outOfBed,
+                latency: Math.round(entry.latency),
+                awakenings: Math.round(entry.awakenings),
+                awake_duration: Math.round(entry.awakeDuration),
+                subjective_quality: Math.round(entry.subjectiveQuality),
+                total_time_in_bed: Math.round(stats.totalTimeInBed),
+                total_sleep_time: Math.round(stats.totalSleepTime),
+                sleep_efficiency: Math.round(stats.sleepEfficiency),
+                sleep_quality_score: Math.round(stats.sleepQualityScore),
+                sleep_debt: Math.round(stats.sleepDebt),
+            })
+            .eq('id', id)
+            .eq('user_id', user.id)
+
+        if (error) {
+            console.error('Error updating sleep log:', error)
+            return { error: error.message }
+        }
+
+        const updatedLog = {
+            ...logToUpdate,
+            lightsOut: entry.lightsOut,
+            wakeUp: entry.wakeUp,
+            outOfBed: entry.outOfBed,
+            latency: Math.round(entry.latency),
+            awakenings: Math.round(entry.awakenings),
+            awakeDuration: Math.round(entry.awakeDuration),
+            subjectiveQuality: Math.round(entry.subjectiveQuality),
+            totalTimeInBed: Math.round(stats.totalTimeInBed),
+            totalSleepTime: Math.round(stats.totalSleepTime),
+            sleepEfficiency: Math.round(stats.sleepEfficiency),
+            sleepQualityScore: Math.round(stats.sleepQualityScore),
+            sleepDebt: Math.round(stats.sleepDebt),
+        }
+
+        setLogs(prev => prev.map(log => log.id === id ? updatedLog : log))
+        return { error: null }
+    }
+
     // Delete a log
     const deleteLog = async (id: string) => {
         if (!user) return { error: 'Not authenticated' }
@@ -523,6 +580,7 @@ export const useSleepData = () => {
         loading,
         error,
         addLog,
+        updateLog,
         deleteLog,
         targetHours,
         setTargetHours,

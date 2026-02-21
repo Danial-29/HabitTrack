@@ -175,6 +175,7 @@ export function useHydrationData() {
             .eq('id', id)
             .eq('user_id', user.id)
 
+
         if (error) {
             console.error('Error finishing drink:', error)
             return { error: error.message }

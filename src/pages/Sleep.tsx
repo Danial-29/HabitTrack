@@ -15,10 +15,11 @@ import { useSleepData } from '../hooks/useSleepData'
 
 export default function Sleep() {
     const navigate = useNavigate()
-    const { logs, addLog, deleteLog, latestStats, calculateStats, loading, targetHours, setTargetHours, targetBedtime, setTargetBedtime, targetWakeTime, setTargetWakeTime } = useSleepData()
+    const { logs, addLog, updateLog, deleteLog, latestStats, calculateStats, loading, targetHours, setTargetHours, targetBedtime, setTargetBedtime, targetWakeTime, setTargetWakeTime } = useSleepData()
 
     // Form State
     const [isEntryModalOpen, setIsEntryModalOpen] = useState(false)
+    const [editingLogId, setEditingLogId] = useState<string | null>(null)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [formData, setFormData] = useState({
@@ -50,11 +51,60 @@ export default function Sleep() {
         }))
     }
 
+    const handleOpenForm = () => {
+        setEditingLogId(null)
+        setFormData({
+            lightsOut: '23:00',
+            wakeUp: '07:00',
+            outOfBed: '07:15',
+            latency: 15,
+            awakenings: 1,
+            awakeDuration: 10,
+            subjectiveQuality: 8
+        })
+        setIsEntryModalOpen(true)
+    }
+
+    const handleEditLog = (log: typeof logs[0]) => {
+        setEditingLogId(log.id)
+        setFormData({
+            lightsOut: log.lightsOut,
+            wakeUp: log.wakeUp,
+            outOfBed: log.outOfBed,
+            latency: log.latency,
+            awakenings: log.awakenings,
+            awakeDuration: log.awakeDuration,
+            subjectiveQuality: log.subjectiveQuality
+        })
+        setSelectedLog(null)
+        setIsEntryModalOpen(true)
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsSubmitting(true)
 
-        await addLog({
+        // Validation: Out of bed cannot be earlier than Wake up
+        const timeToMins = (time: string) => {
+            const [h, m] = time.split(':').map(Number)
+            return h * 60 + m
+        }
+
+        let wakeMins = timeToMins(formData.wakeUp)
+        let outMins = timeToMins(formData.outOfBed)
+
+        // Handle midnight crossing 
+        if (wakeMins > outMins && wakeMins - outMins > 12 * 60) {
+            outMins += 24 * 60
+        }
+
+        if (outMins < wakeMins) {
+            alert("Out of bed time cannot be earlier than wake up time.")
+            setIsSubmitting(false)
+            return
+        }
+
+        const payload = {
             lightsOut: formData.lightsOut,
             wakeUp: formData.wakeUp,
             outOfBed: formData.outOfBed,
@@ -62,10 +112,17 @@ export default function Sleep() {
             awakenings: Number(formData.awakenings),
             awakeDuration: Number(formData.awakeDuration),
             subjectiveQuality: Number(formData.subjectiveQuality)
-        })
+        }
+
+        if (editingLogId) {
+            await updateLog(editingLogId, payload)
+        } else {
+            await addLog(payload)
+        }
 
         setIsSubmitting(false)
         setIsEntryModalOpen(false)
+        setEditingLogId(null)
     }
 
     const handleDeleteLog = async (id: string) => {
@@ -190,7 +247,7 @@ export default function Sleep() {
 
                 {/* Action Button */}
                 <button
-                    onClick={() => setIsEntryModalOpen(true)}
+                    onClick={handleOpenForm}
                     className="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-base shadow-lg shadow-purple-500/20 transition-all active:scale-95 flex items-center justify-center gap-2 mb-6"
                 >
                     <Plus size={20} />
@@ -339,12 +396,20 @@ export default function Sleep() {
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={() => setSelectedLog(null)}
-                                    className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold"
-                                >
-                                    Close
-                                </button>
+                                <div className="grid grid-cols-2 gap-3 mt-6">
+                                    <button
+                                        onClick={() => handleEditLog(selectedLog)}
+                                        className="py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold"
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedLog(null)}
+                                        className="py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )
@@ -397,8 +462,8 @@ export default function Sleep() {
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
                         <div className="bg-[#101622] border border-white/10 w-full max-w-sm rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-xl font-bold">New Sleep Entry</h2>
-                                <button onClick={() => setIsEntryModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+                                <h2 className="text-xl font-bold">{editingLogId ? 'Edit Sleep Entry' : 'New Sleep Entry'}</h2>
+                                <button onClick={() => { setIsEntryModalOpen(false); setEditingLogId(null); }} className="text-slate-400 hover:text-white">✕</button>
                             </div>
 
                             <form onSubmit={handleSubmit} className="space-y-5">
@@ -507,7 +572,7 @@ export default function Sleep() {
                                             Saving...
                                         </>
                                     ) : (
-                                        'Save Entry'
+                                        editingLogId ? 'Save Changes' : 'Save Entry'
                                     )}
                                 </button>
                             </form>
