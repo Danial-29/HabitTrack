@@ -224,7 +224,7 @@ export const useSleepData = () => {
             date: logToUpdate.date
         })
 
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('sleep_logs')
             .update({
                 lights_out: entry.lightsOut,
