@@ -9,7 +9,8 @@ import {
     Loader2,
     Timer,
     Check,
-    Grid
+    Grid,
+    Calendar
 } from 'lucide-react'
 import { useHydrationData } from '../hooks/useHydrationData'
 import type { Preset } from '../hooks/useHydrationData'
@@ -26,6 +27,7 @@ export default function Hydration() {
 
     const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null)
     const [tempGoal, setTempGoal] = useState('')
+    const [customDate, setCustomDate] = useState(new Date().toISOString().split('T')[0])
 
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const isLongPress = useRef(false)
@@ -58,8 +60,8 @@ export default function Hydration() {
     // Wave animation calculation
     const waveTop = 110 - (percentage * 1.2)
 
-    const addIntake = async (amount: number, label: string = "Quick Add") => {
-        await addLog(amount, label)
+    const addIntake = async (amount: number, label: string = "Quick Add", date?: Date) => {
+        await addLog(amount, label, date)
     }
 
     const handlePressStart = (preset: Preset) => {
@@ -124,7 +126,13 @@ export default function Hydration() {
         const amount = Number(customAmount)
         if (amount > 0) {
             const label = customLabel.trim() || 'Custom Entry'
-            await addIntake(amount, label)
+            const date = customDate ? new Date(customDate) : undefined
+            
+            // If date is today, we can just use current time, but if it's a different date,
+            // we should probably set it to mid-day or something similar if user didn't specify time.
+            // For now, new Date(customDate) will set it to 00:00:00 of that date in local time.
+            
+            await addIntake(amount, label, date)
             if (saveAsPreset && !quickButtons.some(p => p.amount === amount)) {
                 const newPreset = { amount, label: customLabel.trim() || undefined }
                 const newPresets = [...quickButtons, newPreset].sort((a, b) => a.amount - b.amount)
@@ -133,6 +141,7 @@ export default function Hydration() {
             setCustomAmount('')
             setCustomLabel('')
             setSaveAsPreset(false)
+            setCustomDate(new Date().toISOString().split('T')[0])
             setIsCustomModalOpen(false)
         }
     }
@@ -394,6 +403,17 @@ export default function Hydration() {
                                         placeholder="Name this drink (optional)"
                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2b6cee] focus:ring-1 focus:ring-[#2b6cee] placeholder:text-white/30 text-white transition-all"
                                     />
+
+                                    <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/5">
+                                        <Calendar size={18} className="text-gray-400" />
+                                        <input
+                                            type="date"
+                                            value={customDate}
+                                            onChange={(e) => setCustomDate(e.target.value)}
+                                            max={new Date().toISOString().split('T')[0]}
+                                            className="bg-transparent text-sm text-white focus:outline-none w-full cursor-pointer"
+                                        />
+                                    </div>
 
                                     <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/5">
                                         <input

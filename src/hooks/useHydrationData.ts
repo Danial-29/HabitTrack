@@ -130,17 +130,18 @@ export function useHydrationData() {
     }
 
     // Add a completed log directly (history)
-    const addLog = async (amount: number, label: string = 'Quick Add') => {
+    const addLog = async (amount: number, label: string = 'Quick Add', date?: Date) => {
         if (!user) return { error: 'Not authenticated' }
 
-        const now = new Date().toISOString()
+        const logDate = date ? date.toISOString() : new Date().toISOString()
         const { data, error } = await supabase
             .from('hydration_logs')
             .insert({
                 user_id: user.id,
                 amount,
                 label,
-                completed_at: now, // Immediately completed
+                logged_at: logDate,
+                completed_at: logDate, // Immediately completed
             })
             .select()
             .single()
@@ -157,7 +158,7 @@ export function useHydrationData() {
             time: new Date(data.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             label: data.label,
             logged_at: data.logged_at,
-            completed_at: now,
+            completed_at: logDate,
         }
         setLogs(prev => [newLog, ...prev])
 
