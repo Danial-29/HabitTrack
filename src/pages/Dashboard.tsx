@@ -29,11 +29,6 @@ export default function Dashboard() {
     const sleepQuality = latestStats ? Math.round(latestStats.sleepQualityScore) : null
     const sleepDuration = latestStats ? `${Math.floor(latestStats.totalSleepTime / 60)}h ${latestStats.totalSleepTime % 60}m` : '--'
 
-    // Yesterday's sleep
-    const yesterdayLog = sleepLogs.length > 1 ? sleepLogs[1] : null
-    const yesterdaySleepStats = yesterdayLog ? calculateStats(yesterdayLog) : null
-    const yesterdaySleep = yesterdaySleepStats ? `${Math.floor(yesterdaySleepStats.totalSleepTime / 60)}h ${yesterdaySleepStats.totalSleepTime % 60}m` : '--'
-
     // --- Dashboard Header Logic ---
 
     // Get user initials for avatar
@@ -157,47 +152,89 @@ export default function Dashboard() {
                 {/* Sleep Analysis Section */}
                 <div className="px-6 py-2 w-full flex justify-center">
                     <Link to="/sleep" className="block w-full">
-                        <div className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-2xl p-5 flex flex-col gap-4 border-l-4 border-l-purple-500 hover:bg-white/5 transition-colors group">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="size-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
-                                        <Moon size={24} />
+                        {(() => {
+                            const todayStr = new Date().toISOString().split('T')[0]
+                            const isLatestToday = latestLog?.date === todayStr
+                            const latestDateLabel = latestLog
+                                ? isLatestToday
+                                    ? 'Last Night'
+                                    : new Date(latestLog.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+                                : null
+
+                            // Previous session (second most recent log)
+                            const prevLog = sleepLogs.length > 1 ? sleepLogs[1] : null
+                            const prevStats = prevLog ? calculateStats(prevLog) : null
+                            const prevDuration = prevStats ? `${Math.floor(prevStats.totalSleepTime / 60)}h ${prevStats.totalSleepTime % 60}m` : '--'
+                            const prevDateLabel = prevLog
+                                ? new Date(prevLog.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+                                : 'Previous'
+
+                            return (
+                                <div className="bg-[rgba(25,34,51,0.7)] backdrop-blur-md border border-white/10 rounded-2xl p-5 flex flex-col gap-4 border-l-4 border-l-purple-500 hover:bg-white/5 transition-colors group">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="size-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
+                                                <Moon size={24} />
+                                            </div>
+                                            <h3 className="text-white font-bold">Sleep Tracker</h3>
+                                        </div>
+                                        {latestDateLabel && (
+                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                                                isLatestToday
+                                                    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                            }`}>
+                                                {latestDateLabel}
+                                            </span>
+                                        )}
                                     </div>
-                                    <h3 className="text-white font-bold">Sleep Tracker</h3>
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 pointer-events-none">
-                                    <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-1">Bedtime</p>
-                                    <div className="text-white font-semibold text-lg">{bedTime}</div>
-                                </div>
-                                <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 pointer-events-none">
-                                    <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-1">Wake Up</p>
-                                    <div className="text-white font-semibold text-lg">{wakeTime}</div>
-                                </div>
-                            </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 pointer-events-none">
+                                            <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-1">Bedtime</p>
+                                            <div className="text-white font-semibold text-lg">{bedTime}</div>
+                                        </div>
+                                        <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 pointer-events-none">
+                                            <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-1">Wake Up</p>
+                                            <div className="text-white font-semibold text-lg">{wakeTime}</div>
+                                        </div>
+                                    </div>
 
-                            {/* Sleep Quality */}
-                            <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 pointer-events-none flex justify-between items-center">
-                                <div>
-                                    <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-1">Sleep Quality</p>
-                                    <div className="text-purple-400 font-bold text-sm">{sleepQuality !== null && sleepQuality >= 85 ? 'Restorative' : sleepQuality !== null && sleepQuality >= 70 ? 'Good' : sleepQuality !== null ? 'Needs Work' : '--'}</div>
-                                </div>
-                                <div className="text-white font-bold text-xl">{sleepQuality !== null ? `${sleepQuality}%` : '--'}</div>
-                            </div>
+                                    {/* Sleep Quality + Duration row */}
+                                    <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 pointer-events-none flex justify-between items-center">
+                                        <div>
+                                            <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-1">Sleep Quality</p>
+                                            <div className="text-purple-400 font-bold text-sm">{sleepQuality !== null && sleepQuality >= 85 ? 'Restorative' : sleepQuality !== null && sleepQuality >= 70 ? 'Good' : sleepQuality !== null ? 'Needs Work' : '--'}</div>
+                                        </div>
+                                        <div className="text-white font-bold text-xl">{sleepQuality !== null ? `${sleepQuality}%` : '--'}</div>
+                                    </div>
 
-                            <div className="flex items-center gap-2 py-1 justify-between">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-slate-400 text-xs font-medium">Session:</span>
-                                    <span className="text-white text-sm font-bold">{sleepDuration}</span>
+                                    {/* Metrics row */}
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div className="bg-slate-900/50 p-2.5 rounded-xl border border-white/5 pointer-events-none text-center">
+                                            <p className="text-slate-500 text-[9px] uppercase font-bold tracking-wider mb-1">Duration</p>
+                                            <span className="text-white text-sm font-bold">{sleepDuration}</span>
+                                        </div>
+                                        <div className="bg-slate-900/50 p-2.5 rounded-xl border border-white/5 pointer-events-none text-center">
+                                            <p className="text-slate-500 text-[9px] uppercase font-bold tracking-wider mb-1">Efficiency</p>
+                                            <span className="text-white text-sm font-bold">{latestStats ? `${Math.round(latestStats.sleepEfficiency)}%` : '--'}</span>
+                                        </div>
+                                        <div className="bg-slate-900/50 p-2.5 rounded-xl border border-white/5 pointer-events-none text-center">
+                                            <p className="text-slate-500 text-[9px] uppercase font-bold tracking-wider mb-1">Debt</p>
+                                            <span className={`text-sm font-bold ${latestStats && latestStats.sleepDebt > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                                {latestStats ? `${latestStats.sleepDebt > 0 ? '+' : ''}${latestStats.sleepDebt.toFixed(1)}h` : '--'}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Previous session */}
+                                    <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                                        <span className="text-slate-500 text-xs font-medium">{prevDateLabel}:</span>
+                                        <span className="text-slate-300 text-sm font-bold">{prevDuration}</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-slate-400 text-xs font-medium">Yesterday:</span>
-                                    <span className="text-white text-sm font-bold">{yesterdaySleep}</span>
-                                </div>
-                            </div>
-                        </div>
+                            )
+                        })()}
                     </Link>
                 </div>
 

@@ -348,12 +348,17 @@ export const useSleepData = () => {
         return totalScore / logs.length
     }
 
-    // Get stats for a specific period (7 or 30 days)
-    const getStatsForPeriod = (days: 7 | 30) => {
+    // Filter logs by period (0 = lifetime / all data)
+    const filterLogsByPeriod = (days: number) => {
+        if (days === 0) return logs
         const cutoffDate = new Date()
         cutoffDate.setDate(cutoffDate.getDate() - days)
+        return logs.filter(log => new Date(log.date) >= cutoffDate)
+    }
 
-        const periodLogs = logs.filter(log => new Date(log.date) >= cutoffDate)
+    // Get stats for a specific period (0 = lifetime)
+    const getStatsForPeriod = (days: number) => {
+        const periodLogs = filterLogsByPeriod(days)
 
         if (periodLogs.length === 0) {
             return {
@@ -384,11 +389,8 @@ export const useSleepData = () => {
     }
 
     // Calculate consistency score based on variance in lights_out times
-    const getConsistencyScore = (days: 7 | 30 = 7) => {
-        const cutoffDate = new Date()
-        cutoffDate.setDate(cutoffDate.getDate() - days)
-
-        const periodLogs = logs.filter(log => new Date(log.date) >= cutoffDate)
+    const getConsistencyScore = (days: number = 7) => {
+        const periodLogs = filterLogsByPeriod(days)
 
         if (periodLogs.length < 2) return { score: 100, variance: 0 }
 
@@ -416,11 +418,8 @@ export const useSleepData = () => {
     }
 
     // Calculate grogginess factor (time between wake_up and out_of_bed)
-    const getGrogginessFactor = (days: 7 | 30 = 7) => {
-        const cutoffDate = new Date()
-        cutoffDate.setDate(cutoffDate.getDate() - days)
-
-        const periodLogs = logs.filter(log => new Date(log.date) >= cutoffDate)
+    const getGrogginessFactor = (days: number = 7) => {
+        const periodLogs = filterLogsByPeriod(days)
 
         if (periodLogs.length === 0) return { avgMinutes: 0, logsCount: 0 }
 
@@ -447,11 +446,8 @@ export const useSleepData = () => {
     }
 
     // Compare weekday vs weekend sleep
-    const getWeekdayVsWeekend = (days: 30 = 30) => {
-        const cutoffDate = new Date()
-        cutoffDate.setDate(cutoffDate.getDate() - days)
-
-        const periodLogs = logs.filter(log => new Date(log.date) >= cutoffDate)
+    const getWeekdayVsWeekend = (days: number = 30) => {
+        const periodLogs = filterLogsByPeriod(days)
 
         const weekdayLogs: SleepLog[] = []
         const weekendLogs: SleepLog[] = []
@@ -486,13 +482,28 @@ export const useSleepData = () => {
     }
 
     // Generate all dates in a period and build a lookup of logged dates
+    // days=0 means lifetime: range from oldest log to today
     const generateDateRange = (days: number) => {
         const dates: string[] = []
         const today = new Date()
-        for (let i = days - 1; i >= 0; i--) {
-            const d = new Date(today)
-            d.setDate(d.getDate() - i)
-            dates.push(d.toISOString().split('T')[0])
+
+        if (days === 0) {
+            // Lifetime: from oldest log to today
+            if (logs.length === 0) return dates
+            const sortedLogs = [...logs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+            const oldest = new Date(sortedLogs[0].date)
+            const totalDays = Math.ceil((today.getTime() - oldest.getTime()) / (1000 * 60 * 60 * 24)) + 1
+            for (let i = totalDays - 1; i >= 0; i--) {
+                const d = new Date(today)
+                d.setDate(d.getDate() - i)
+                dates.push(d.toISOString().split('T')[0])
+            }
+        } else {
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date(today)
+                d.setDate(d.getDate() - i)
+                dates.push(d.toISOString().split('T')[0])
+            }
         }
         return dates
     }
@@ -504,11 +515,8 @@ export const useSleepData = () => {
     }
 
     // Get efficiency trend data for chart
-    const getEfficiencyTrend = (days: 7 | 30 = 7) => {
-        const cutoffDate = new Date()
-        cutoffDate.setDate(cutoffDate.getDate() - days)
-
-        const periodLogs = logs.filter(log => new Date(log.date) >= cutoffDate)
+    const getEfficiencyTrend = (days: number = 7) => {
+        const periodLogs = filterLogsByPeriod(days)
         const logMap = buildLogLookup(periodLogs)
         const allDates = generateDateRange(days)
 
@@ -522,11 +530,8 @@ export const useSleepData = () => {
     }
 
     // Get data for sleep architecture chart
-    const getSleepArchitectureData = (days: 7 | 30 = 7) => {
-        const cutoffDate = new Date()
-        cutoffDate.setDate(cutoffDate.getDate() - days)
-
-        const periodLogs = logs.filter(log => new Date(log.date) >= cutoffDate)
+    const getSleepArchitectureData = (days: number = 7) => {
+        const periodLogs = filterLogsByPeriod(days)
         const logMap = buildLogLookup(periodLogs)
         const allDates = generateDateRange(days)
 
@@ -555,11 +560,8 @@ export const useSleepData = () => {
     }
 
     // Get data for consistency chart (floating bars)
-    const getConsistencyChartData = (days: 7 | 30 = 7) => {
-        const cutoffDate = new Date()
-        cutoffDate.setDate(cutoffDate.getDate() - days)
-
-        const periodLogs = logs.filter(log => new Date(log.date) >= cutoffDate)
+    const getConsistencyChartData = (days: number = 7) => {
+        const periodLogs = filterLogsByPeriod(days)
         const logMap = buildLogLookup(periodLogs)
         const allDates = generateDateRange(days)
 
@@ -585,11 +587,8 @@ export const useSleepData = () => {
     }
 
     // Get data for quality vs duration scatter plot
-    const getQualityVsDurationData = (days: 30 = 30) => {
-        const cutoffDate = new Date()
-        cutoffDate.setDate(cutoffDate.getDate() - days)
-
-        const periodLogs = logs.filter(log => new Date(log.date) >= cutoffDate)
+    const getQualityVsDurationData = (days: number = 30) => {
+        const periodLogs = filterLogsByPeriod(days)
 
         return periodLogs.map(log => {
             const stats = calculateStats(log)
@@ -602,11 +601,8 @@ export const useSleepData = () => {
     }
 
     // Get data for bedtime vs quality heatmap
-    const getBedtimeQualityData = (days: 30 = 30) => {
-        const cutoffDate = new Date()
-        cutoffDate.setDate(cutoffDate.getDate() - days)
-
-        const periodLogs = logs.filter(log => new Date(log.date) >= cutoffDate)
+    const getBedtimeQualityData = (days: number = 30) => {
+        const periodLogs = filterLogsByPeriod(days)
 
         return periodLogs.map(log => ({
             date: log.date,

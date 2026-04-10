@@ -15,7 +15,7 @@ type TabType = 'hydration' | 'sleep'
 
 export default function Stats() {
     const [activeTab, setActiveTab] = useState<TabType>('hydration')
-    const [periodDays, setPeriodDays] = useState<7 | 30>(7)
+    const [periodDays, setPeriodDays] = useState<number>(7)
 
     // Sleep data
     const {
@@ -49,12 +49,12 @@ export default function Stats() {
     const periodStats = getStatsForPeriod(periodDays)
     const consistencyData = getConsistencyScore(periodDays)
     const grogginess = getGrogginessFactor(periodDays)
-    const weekdayWeekend = getWeekdayVsWeekend()
+    const weekdayWeekend = getWeekdayVsWeekend(periodDays)
     const efficiencyTrend = getEfficiencyTrend(periodDays)
     const architectureData = getSleepArchitectureData(periodDays)
     const consistencyChartData = getConsistencyChartData(periodDays)
-    const qualityDurationData = getQualityVsDurationData()
-    const bedtimeQualityData = getBedtimeQualityData()
+    const qualityDurationData = getQualityVsDurationData(periodDays)
+    const bedtimeQualityData = getBedtimeQualityData(periodDays)
 
     // Calculate hydration stats
     const hydrationPeriodStats = getHydrationStats(periodDays)
@@ -374,25 +374,24 @@ export default function Stats() {
                     ) : (
                         <div className="flex flex-col gap-4">
                             {/* Period Selector */}
-                            <div className="flex items-center justify-end gap-2 mb-2">
-                                <button
-                                    onClick={() => setPeriodDays(7)}
-                                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${periodDays === 7
-                                        ? 'bg-purple-500/30 text-purple-300'
-                                        : 'text-slate-500 hover:text-slate-300'
-                                        }`}
-                                >
-                                    7 Days
-                                </button>
-                                <button
-                                    onClick={() => setPeriodDays(30)}
-                                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${periodDays === 30
-                                        ? 'bg-purple-500/30 text-purple-300'
-                                        : 'text-slate-500 hover:text-slate-300'
-                                        }`}
-                                >
-                                    30 Days
-                                </button>
+                            <div className="flex items-center justify-end gap-1.5 mb-2">
+                                {[
+                                    { value: 7, label: '7D' },
+                                    { value: 30, label: '30D' },
+                                    { value: 90, label: '90D' },
+                                    { value: 0, label: 'All' },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => setPeriodDays(opt.value)}
+                                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${periodDays === opt.value
+                                            ? 'bg-purple-500/30 text-purple-300'
+                                            : 'text-slate-500 hover:text-slate-300'
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
                             </div>
 
                             {sleepLoading ? (
