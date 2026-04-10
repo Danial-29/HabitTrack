@@ -197,53 +197,79 @@ export default function Sleep() {
                 </header>
 
                 {/* Main Stats Card */}
-                <div className={`relative w-full p-5 rounded-3xl ${glassCardClass} ${glowShadow} mb-4 overflow-hidden`}>
-                    {/* Decorative Elements */}
-                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-50" />
+                {(() => {
+                    const latestLog = logs.length > 0 ? logs[0] : null
+                    const todayStr = new Date().toISOString().split('T')[0]
+                    const isToday = latestLog?.date === todayStr
+                    const isStale = latestLog && !isToday
 
-                    <div className="relative z-10 flex flex-col items-center text-center">
-                        <button
-                            onClick={() => setExplanation(metricExplanations.quality)}
-                            className="group flex flex-col items-center"
-                        >
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 group-active:scale-95 transition-transform">Sleep Quality Score</span>
-                            <div className="flex items-baseline gap-1 mb-2 group-active:scale-95 transition-transform">
-                                <span className={`text-5xl font-extrabold ${neonText}`}>
-                                    {latestStats ? Math.round(latestStats.sleepQualityScore) : '--'}
-                                </span>
-                                <span className="text-lg text-slate-500 font-bold">/ 100</span>
+                    const dateLabel = latestLog
+                        ? isToday
+                            ? 'Last Night'
+                            : new Date(latestLog.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+                        : null
+
+                    return (
+                        <div className={`relative w-full p-5 rounded-3xl ${glassCardClass} ${latestStats && !isStale ? glowShadow : ''} mb-4 overflow-hidden`}>
+                            {/* Decorative Elements */}
+                            <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-3xl pointer-events-none ${isStale ? 'bg-amber-500/10' : 'bg-purple-500/20'}`} />
+                            <div className={`absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent ${isStale ? 'via-amber-500' : 'via-purple-500'} to-transparent opacity-50`} />
+
+                            <div className="relative z-10 flex flex-col items-center text-center">
+                                {/* Date indicator */}
+                                {dateLabel && (
+                                    <div className={`text-[10px] font-bold uppercase tracking-widest mb-2 px-3 py-1 rounded-full ${
+                                        isToday
+                                            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    }`}>
+                                        {dateLabel}
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={() => setExplanation(metricExplanations.quality)}
+                                    className="group flex flex-col items-center"
+                                >
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 group-active:scale-95 transition-transform">Sleep Quality Score</span>
+                                    <div className="flex items-baseline gap-1 mb-2 group-active:scale-95 transition-transform">
+                                        <span className={`text-5xl font-extrabold ${isStale ? 'text-amber-400/70' : neonText}`}>
+                                            {latestStats ? Math.round(latestStats.sleepQualityScore) : '--'}
+                                        </span>
+                                        <span className="text-lg text-slate-500 font-bold">/ 100</span>
+                                    </div>
+                                </button>
+
+                                <div className="grid grid-cols-3 gap-3 w-full mt-2">
+                                    <button
+                                        onClick={() => setExplanation(metricExplanations.efficiency)}
+                                        className="flex flex-col items-center p-2.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors active:scale-95"
+                                    >
+                                        <Activity size={16} className="text-blue-400 mb-1.5" />
+                                        <span className="text-lg font-bold">{latestStats ? Math.round(latestStats.sleepEfficiency) : '--'}%</span>
+                                        <span className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Efficiency</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setExplanation(metricExplanations.duration)}
+                                        className="flex flex-col items-center p-2.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors active:scale-95"
+                                    >
+                                        <Clock size={16} className="text-emerald-400 mb-1.5" />
+                                        <span className="text-lg font-bold">{latestStats ? `${Math.floor(latestStats.totalSleepTime / 60)}h ${latestStats.totalSleepTime % 60}m` : '--'}</span>
+                                        <span className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Duration</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setExplanation(metricExplanations.debt)}
+                                        className="flex flex-col items-center p-2.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors active:scale-95"
+                                    >
+                                        <Zap size={16} className={latestStats && latestStats.sleepDebt > 0 ? "text-red-400 mb-1.5" : "text-green-400 mb-1.5"} />
+                                        <span className="text-lg font-bold">{latestStats ? (latestStats.sleepDebt > 0 ? `+${latestStats.sleepDebt.toFixed(1)}` : latestStats.sleepDebt.toFixed(1)) : '--'}h</span>
+                                        <span className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Debt</span>
+                                    </button>
+                                </div>
                             </div>
-                        </button>
-
-                        <div className="grid grid-cols-3 gap-3 w-full mt-2">
-                            <button
-                                onClick={() => setExplanation(metricExplanations.efficiency)}
-                                className="flex flex-col items-center p-2.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors active:scale-95"
-                            >
-                                <Activity size={16} className="text-blue-400 mb-1.5" />
-                                <span className="text-lg font-bold">{latestStats ? Math.round(latestStats.sleepEfficiency) : '--'}%</span>
-                                <span className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Efficiency</span>
-                            </button>
-                            <button
-                                onClick={() => setExplanation(metricExplanations.duration)}
-                                className="flex flex-col items-center p-2.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors active:scale-95"
-                            >
-                                <Clock size={16} className="text-emerald-400 mb-1.5" />
-                                <span className="text-lg font-bold">{latestStats ? `${Math.floor(latestStats.totalSleepTime / 60)}h ${latestStats.totalSleepTime % 60}m` : '--'}</span>
-                                <span className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Duration</span>
-                            </button>
-                            <button
-                                onClick={() => setExplanation(metricExplanations.debt)}
-                                className="flex flex-col items-center p-2.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors active:scale-95"
-                            >
-                                <Zap size={16} className={latestStats && latestStats.sleepDebt > 0 ? "text-red-400 mb-1.5" : "text-green-400 mb-1.5"} />
-                                <span className="text-lg font-bold">{latestStats ? (latestStats.sleepDebt > 0 ? `+${latestStats.sleepDebt.toFixed(1)}` : latestStats.sleepDebt.toFixed(1)) : '--'}h</span>
-                                <span className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Debt</span>
-                            </button>
                         </div>
-                    </div>
-                </div>
+                    )
+                })()}
 
                 {/* Action Button */}
                 <button
