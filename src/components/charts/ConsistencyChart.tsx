@@ -3,6 +3,7 @@ import { useState } from 'react'
 interface ConsistencyChartProps {
     data: {
         date: string
+        missing?: boolean
         lightsOut: string
         wakeUp: string
         outOfBed: string
@@ -104,16 +105,65 @@ export default function ConsistencyChart({ data }: ConsistencyChartProps) {
 
                 {/* Bars */}
                 {data.map((entry, i) => {
-                    const sleepStart = timeToMinutes(entry.lightsOut)
-                    const sleepEnd = timeToMinutes(entry.wakeUp)
-
-                    const y1 = padding.top + ((sleepStart - minTime) / timeRange) * chartHeight
-                    const y2 = padding.top + ((sleepEnd - minTime) / timeRange) * chartHeight
                     const x = padding.left + 20 + i * 40
 
                     // Format date for label
                     const date = new Date(entry.date)
                     const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)
+
+                    const isMissing = entry.missing === true
+
+                    if (isMissing) {
+                        // Render a dashed outline placeholder for missing days
+                        const placeholderY = padding.top + ((22 * 60 - minTime) / timeRange) * chartHeight // ~10 PM position
+                        const placeholderHeight = (8 * 60 / timeRange) * chartHeight // ~8 hour placeholder height
+
+                        return (
+                            <g
+                                key={entry.date}
+                                onClick={() => handleBarClick(i)}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                {/* Dashed outline placeholder bar */}
+                                <rect
+                                    x={x - barWidth / 2}
+                                    y={placeholderY}
+                                    width={barWidth}
+                                    height={placeholderHeight}
+                                    rx={4}
+                                    fill="none"
+                                    className="stroke-slate-600"
+                                    strokeWidth={1.5}
+                                    strokeDasharray="4,3"
+                                />
+                                {/* "—" marker in center */}
+                                <text
+                                    x={x}
+                                    y={placeholderY + placeholderHeight / 2 + 1}
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    className="fill-slate-600 text-[10px] font-medium"
+                                >
+                                    —
+                                </text>
+                                {/* Day label */}
+                                <text
+                                    x={x}
+                                    y={chartHeight + padding.top + 16}
+                                    textAnchor="middle"
+                                    className="fill-slate-600 text-[10px] font-medium"
+                                >
+                                    {dayLabel}
+                                </text>
+                            </g>
+                        )
+                    }
+
+                    const sleepStart = timeToMinutes(entry.lightsOut)
+                    const sleepEnd = timeToMinutes(entry.wakeUp)
+
+                    const y1 = padding.top + ((sleepStart - minTime) / timeRange) * chartHeight
+                    const y2 = padding.top + ((sleepEnd - minTime) / timeRange) * chartHeight
 
                     const isSelected = selectedIndex === i
 
@@ -167,49 +217,68 @@ export default function ConsistencyChart({ data }: ConsistencyChartProps) {
                     className="mt-3 bg-[rgba(25,34,51,0.9)] backdrop-blur-xl border border-white/15 rounded-xl p-4 animate-in slide-in-from-top-2 duration-200"
                     onClick={() => setSelectedIndex(null)}
                 >
-                    {/* Date Header */}
-                    <div className="text-white font-bold text-sm mb-3 pb-2 border-b border-white/10">
-                        {new Date(selectedEntry.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'short',
-                            day: 'numeric'
-                        })}
-                    </div>
-
-                    {/* Metrics */}
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className="text-lg">🌙</span>
-                                <span className="text-slate-400 text-xs">Lights out</span>
+                    {selectedEntry.missing ? (
+                        <>
+                            {/* Missing day detail */}
+                            <div className="text-white font-bold text-sm mb-3 pb-2 border-b border-white/10">
+                                {new Date(selectedEntry.date).toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    month: 'short',
+                                    day: 'numeric'
+                                })}
                             </div>
-                            <span className="text-purple-400 font-semibold text-sm">{formatTime(selectedEntry.lightsOut)}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className="text-lg">☀️</span>
-                                <span className="text-slate-400 text-xs">Woke up</span>
+                            <div className="flex items-center justify-center gap-2 py-3">
+                                <span className="text-lg">🚫</span>
+                                <span className="text-slate-400 text-sm font-medium">Not Logged</span>
                             </div>
-                            <span className="text-amber-400 font-semibold text-sm">{formatTime(selectedEntry.wakeUp)}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className="text-lg">🚶</span>
-                                <span className="text-slate-400 text-xs">Out of bed</span>
+                        </>
+                    ) : (
+                        <>
+                            {/* Date Header */}
+                            <div className="text-white font-bold text-sm mb-3 pb-2 border-b border-white/10">
+                                {new Date(selectedEntry.date).toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    month: 'short',
+                                    day: 'numeric'
+                                })}
                             </div>
-                            <span className="text-green-400 font-semibold text-sm">{formatTime(selectedEntry.outOfBed)}</span>
-                        </div>
 
-                        <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className="text-lg">💤</span>
-                                <span className="text-slate-300 text-xs font-medium">Total time in bed</span>
+                            {/* Metrics */}
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">🌙</span>
+                                        <span className="text-slate-400 text-xs">Lights out</span>
+                                    </div>
+                                    <span className="text-purple-400 font-semibold text-sm">{formatTime(selectedEntry.lightsOut)}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">☀️</span>
+                                        <span className="text-slate-400 text-xs">Woke up</span>
+                                    </div>
+                                    <span className="text-amber-400 font-semibold text-sm">{formatTime(selectedEntry.wakeUp)}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">🚶</span>
+                                        <span className="text-slate-400 text-xs">Out of bed</span>
+                                    </div>
+                                    <span className="text-green-400 font-semibold text-sm">{formatTime(selectedEntry.outOfBed)}</span>
+                                </div>
+
+                                <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">💤</span>
+                                        <span className="text-slate-300 text-xs font-medium">Total time in bed</span>
+                                    </div>
+                                    <span className="text-white font-bold text-sm">{calculateDuration(selectedEntry.lightsOut, selectedEntry.outOfBed)}</span>
+                                </div>
                             </div>
-                            <span className="text-white font-bold text-sm">{calculateDuration(selectedEntry.lightsOut, selectedEntry.outOfBed)}</span>
-                        </div>
-                    </div>
+                        </>
+                    )}
 
                     <p className="text-slate-600 text-[10px] text-center mt-3">Tap to dismiss</p>
                 </div>

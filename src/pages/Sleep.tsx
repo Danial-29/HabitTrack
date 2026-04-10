@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     ArrowLeft,
@@ -271,45 +271,81 @@ export default function Sleep() {
                             <Moon size={40} className="mx-auto mb-3 opacity-20" />
                             <p className="text-sm">No sleep logs yet.</p>
                         </div>
-                    ) : (
-                        logs.map(log => {
-                            const stats = calculateStats(log)
-                            return (
-                                <div
-                                    key={log.id}
-                                    onClick={() => setSelectedLog(log)}
-                                    className={`group relative p-3.5 rounded-2xl ${glassCardClass} hover:bg-white/5 transition-all cursor-pointer`}
-                                >
-                                    <div className="flex justify-between items-start mb-1.5">
-                                        <div>
-                                            <p className="text-sm font-bold text-white">{new Date(log.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
-                                            <p className="text-[11px] text-slate-400">{log.lightsOut} - {log.wakeUp}</p>
+                    ) : (() => {
+                        // Build a gap-filled timeline
+                        const logMap = new Map(logs.map(log => [log.date, log]))
+                        const today = new Date()
+                        const todayStr = today.toISOString().split('T')[0]
+
+                        // Go back 14 days or to the oldest log, whichever is further
+                        const oldestLog = logs[logs.length - 1]
+                        const fourteenDaysAgo = new Date(today)
+                        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13)
+                        const oldestDate = oldestLog ? new Date(Math.min(new Date(oldestLog.date).getTime(), fourteenDaysAgo.getTime())) : fourteenDaysAgo
+
+                        const allDates: string[] = []
+                        const cursor = new Date(todayStr)
+                        while (cursor >= oldestDate) {
+                            allDates.push(cursor.toISOString().split('T')[0])
+                            cursor.setDate(cursor.getDate() - 1)
+                        }
+
+                        return allDates.map(dateStr => {
+                            const log = logMap.get(dateStr)
+                            if (log) {
+                                const stats = calculateStats(log)
+                                return (
+                                    <div
+                                        key={log.id}
+                                        onClick={() => setSelectedLog(log)}
+                                        className={`group relative p-3.5 rounded-2xl ${glassCardClass} hover:bg-white/5 transition-all cursor-pointer`}
+                                    >
+                                        <div className="flex justify-between items-start mb-1.5">
+                                            <div>
+                                                <p className="text-sm font-bold text-white">{new Date(log.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                                                <p className="text-[11px] text-slate-400">{log.lightsOut} - {log.wakeUp}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-base font-bold ${neonText}`}>{Math.round(stats.sleepQualityScore)}</span>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteLog(log.id) }}
+                                                    className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-base font-bold ${neonText}`}>{Math.round(stats.sleepQualityScore)}</span>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteLog(log.id) }}
-                                                className="text-slate-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
+
+                                        <div className="flex gap-4 mt-1.5 border-t border-white/5 pt-1.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                                <span className="text-[11px] text-slate-300">{Math.round(stats.sleepEfficiency)}% Eff.</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                                <span className="text-[11px] text-slate-300">{Math.floor(stats.totalSleepTime / 60)}h {stats.totalSleepTime % 60}m Sleep</span>
+                                            </div>
                                         </div>
                                     </div>
+                                )
+                            }
 
-                                    <div className="flex gap-4 mt-1.5 border-t border-white/5 pt-1.5">
-                                        <div className="flex items-center gap-1.5">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                                            <span className="text-[11px] text-slate-300">{Math.round(stats.sleepEfficiency)}% Eff.</span>
+                            // Not Logged card
+                            return (
+                                <div
+                                    key={`missing-${dateStr}`}
+                                    className="relative p-3.5 rounded-2xl border border-dashed border-white/10 bg-white/[0.01] transition-all"
+                                >
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-500">{new Date(dateStr).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</p>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                            <span className="text-[11px] text-slate-300">{Math.floor(stats.totalSleepTime / 60)}h {stats.totalSleepTime % 60}m Sleep</span>
-                                        </div>
+                                        <span className="text-[11px] text-slate-600 font-medium">Not Logged</span>
                                     </div>
                                 </div>
                             )
                         })
-                    )}
+                    })()}
                 </div>
 
                 {/* Detail View Modal */}

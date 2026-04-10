@@ -1,7 +1,7 @@
 interface EfficiencyTrendChartProps {
     data: {
         date: string
-        efficiency: number
+        efficiency: number | null
     }[]
 }
 
@@ -24,19 +24,49 @@ export default function EfficiencyTrendChart({ data }: EfficiencyTrendChartProps
     const minEff = 60
     const maxEff = 100
 
-    // Convert to coordinates
+    // Convert to coordinates, separating logged vs missing
     const points = data.map((d, i) => ({
         x: padding.left + (i / Math.max(data.length - 1, 1)) * plotWidth,
-        y: padding.top + plotHeight - ((Math.min(Math.max(d.efficiency, minEff), maxEff) - minEff) / (maxEff - minEff)) * plotHeight,
+        y: d.efficiency !== null
+            ? padding.top + plotHeight - ((Math.min(Math.max(d.efficiency, minEff), maxEff) - minEff) / (maxEff - minEff)) * plotHeight
+            : null,
         efficiency: d.efficiency,
-        date: d.date
+        date: d.date,
+        missing: d.efficiency === null
     }))
 
-    // Create path for line
-    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+    // Build line segments that break at gaps (connect consecutive non-null points)
+    const lineSegments: string[] = []
+    let currentSegment = ''
 
-    // Create path for gradient fill
-    const areaPath = `${linePath} L ${points[points.length - 1].x} ${chartHeight - padding.bottom} L ${padding.left} ${chartHeight - padding.bottom} Z`
+    points.forEach((p) => {
+        if (p.y !== null) {
+            if (currentSegment === '') {
+                currentSegment = `M ${p.x} ${p.y}`
+            } else {
+                currentSegment += ` L ${p.x} ${p.y}`
+            }
+        } else {
+            if (currentSegment !== '') {
+                lineSegments.push(currentSegment)
+                currentSegment = ''
+            }
+        }
+    })
+    if (currentSegment !== '') {
+        lineSegments.push(currentSegment)
+    }
+
+    // Build area fill paths for each segment
+    const areaSegments: string[] = lineSegments.map(segment => {
+        // Extract the x coordinates from the path to close the area
+        const coords = segment.replace(/[ML]/g, '').trim().split(/\s+/).map(Number)
+        if (coords.length < 4) return '' // Need at least 2 points
+        const firstX = coords[0]
+        const lastX = coords[coords.length - 2]
+        const bottomY = chartHeight - padding.bottom
+        return `${segment} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`
+    }).filter(Boolean)
 
     // 85% threshold line position
     const thresholdY = padding.top + plotHeight - ((85 - minEff) / (maxEff - minEff)) * plotHeight
@@ -90,37 +120,62 @@ export default function EfficiencyTrendChart({ data }: EfficiencyTrendChartProps
                     )
                 })}
 
-                {/* Area fill */}
-                <path
-                    d={areaPath}
-                    fill="url(#efficiencyGradient)"
-                />
-
-                {/* Line */}
-                <path
-                    d={linePath}
-                    fill="none"
-                    className="stroke-green-500"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                />
-
-                {/* Data points */}
-                {points.map((point, i) => (
-                    <circle
-                        key={i}
-                        cx={point.x}
-                        cy={point.y}
-                        r={4}
-                        className={point.efficiency >= 85 ? 'fill-green-500' : 'fill-amber-500'}
-                        style={{
-                            filter: point.efficiency >= 85
-                                ? 'drop-shadow(0 0 4px rgba(34, 197, 94, 0.6))'
-                                : 'drop-shadow(0 0 4px rgba(245, 158, 11, 0.6))'
-                        }}
+                {/* Area fills (one per connected segment) */}
+                {areaSegments.map((areaPath, i) => (
+                    <path
+                        key={`area-${i}`}
+                        d={areaPath}
+                        fill="url(#efficiencyGradient)"
                     />
                 ))}
+
+                {/* Lines (one per connected segment — breaks at gaps) */}
+                {lineSegments.map((linePath, i) => (
+                    <path
+                        key={`line-${i}`}
+                        d={linePath}
+                        fill="none"
+                        className="stroke-green-500"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                ))}
+
+                {/* Data points and gap markers */}
+                {points.map((point, i) => {
+                    if (point.missing) {
+                        // Show a small × marker for missing days
+                        const gapY = padding.top + plotHeight / 2
+                        return (
+                            <text
+                                key={i}
+                                x={point.x}
+                                y={gapY + 1}
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                                className="fill-slate-600 text-[8px] font-bold"
+                            >
+                                ×
+                            </text>
+                        )
+                    }
+
+                    return (
+                        <circle
+                            key={i}
+                            cx={point.x}
+                            cy={point.y!}
+                            r={4}
+                            className={point.efficiency! >= 85 ? 'fill-green-500' : 'fill-amber-500'}
+                            style={{
+                                filter: point.efficiency! >= 85
+                                    ? 'drop-shadow(0 0 4px rgba(34, 197, 94, 0.6))'
+                                    : 'drop-shadow(0 0 4px rgba(245, 158, 11, 0.6))'
+                            }}
+                        />
+                    )
+                })}
             </svg>
         </div>
     )

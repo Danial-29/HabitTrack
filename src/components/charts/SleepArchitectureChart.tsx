@@ -3,6 +3,7 @@ import { useState } from 'react'
 interface SleepArchitectureChartProps {
     data: {
         date: string
+        missing?: boolean
         latency: number
         awakeDuration: number
         totalSleepTime: number
@@ -21,8 +22,11 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
         )
     }
 
-    // Find max time for scaling
-    const maxTime = Math.max(...data.map(d => d.totalTimeInBed), 480) // At least 8 hours
+    // Find max time for scaling (only from logged days)
+    const loggedData = data.filter(d => !d.missing)
+    const maxTime = loggedData.length > 0
+        ? Math.max(...loggedData.map(d => d.totalTimeInBed), 480)
+        : 480 // At least 8 hours
 
     const barHeight = 24
     const barGap = 12
@@ -61,6 +65,9 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
 
                     <rect x={100} y={0} width={10} height={10} rx={2} className="fill-purple-500/80" />
                     <text x={114} y={8} className="fill-slate-400 text-[8px]">Sleep</text>
+
+                    <rect x={145} y={0} width={10} height={10} rx={2} fill="none" className="stroke-slate-600" strokeWidth={1.5} strokeDasharray="3,2" />
+                    <text x={159} y={8} className="fill-slate-500 text-[8px]">No data</text>
                 </g>
 
                 {/* Bars */}
@@ -68,15 +75,68 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
                     const y = padding.top + 10 + i * (barHeight + barGap)
                     const barMaxWidth = chartWidth - padding.left - padding.right - 25
 
-                    const latencyWidth = (entry.latency / maxTime) * barMaxWidth
-                    const awakeWidth = (entry.awakeDuration / maxTime) * barMaxWidth
-                    const sleepWidth = (entry.totalSleepTime / maxTime) * barMaxWidth
-
                     // Format date
                     const date = new Date(entry.date)
                     const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' }).substring(0, 2)
 
                     const isSelected = selectedIndex === i
+                    const isMissing = entry.missing === true
+
+                    if (isMissing) {
+                        return (
+                            <g
+                                key={entry.date}
+                                onClick={() => handleBarClick(i)}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                {/* Day label */}
+                                <text
+                                    x={padding.left}
+                                    y={y + barHeight / 2 + 4}
+                                    className="fill-slate-600 text-[10px] font-medium"
+                                >
+                                    {dayLabel}
+                                </text>
+
+                                {/* Dashed outline placeholder bar */}
+                                <g transform={`translate(${padding.left + 25}, ${y})`}>
+                                    <rect
+                                        x={0}
+                                        y={0}
+                                        width={barMaxWidth * 0.6}
+                                        height={barHeight}
+                                        rx={4}
+                                        fill="none"
+                                        className="stroke-slate-600/60"
+                                        strokeWidth={1.5}
+                                        strokeDasharray="6,4"
+                                    />
+                                    <text
+                                        x={barMaxWidth * 0.3}
+                                        y={barHeight / 2 + 1}
+                                        textAnchor="middle"
+                                        dominantBaseline="middle"
+                                        className="fill-slate-600 text-[9px] font-medium"
+                                    >
+                                        Not Logged
+                                    </text>
+                                </g>
+
+                                {/* Duration label area - show dash */}
+                                <text
+                                    x={chartWidth - padding.right + 2}
+                                    y={y + barHeight / 2 + 4}
+                                    className="fill-slate-600 text-[10px] font-semibold"
+                                >
+                                    —
+                                </text>
+                            </g>
+                        )
+                    }
+
+                    const latencyWidth = (entry.latency / maxTime) * barMaxWidth
+                    const awakeWidth = (entry.awakeDuration / maxTime) * barMaxWidth
+                    const sleepWidth = (entry.totalSleepTime / maxTime) * barMaxWidth
 
                     return (
                         <g
@@ -155,46 +215,65 @@ export default function SleepArchitectureChart({ data }: SleepArchitectureChartP
                     className="mt-3 bg-[rgba(25,34,51,0.9)] backdrop-blur-xl border border-white/15 rounded-xl p-4 animate-in slide-in-from-top-2 duration-200"
                     onClick={() => setSelectedIndex(null)}
                 >
-                    {/* Date Header */}
-                    <div className="text-white font-bold text-sm mb-3 pb-2 border-b border-white/10">
-                        {new Date(selectedEntry.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'short',
-                            day: 'numeric'
-                        })}
-                    </div>
-
-                    {/* Metrics */}
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="size-3 rounded-sm bg-amber-500/80"></div>
-                                <span className="text-slate-400 text-xs">Fell asleep in</span>
+                    {selectedEntry.missing ? (
+                        <>
+                            {/* Missing day detail */}
+                            <div className="text-white font-bold text-sm mb-3 pb-2 border-b border-white/10">
+                                {new Date(selectedEntry.date).toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    month: 'short',
+                                    day: 'numeric'
+                                })}
                             </div>
-                            <span className="text-amber-400 font-semibold text-sm">{formatMinutes(selectedEntry.latency)}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="size-3 rounded-sm bg-red-500/80"></div>
-                                <span className="text-slate-400 text-xs">Awake during night</span>
+                            <div className="flex items-center justify-center gap-2 py-3">
+                                <span className="text-lg">🚫</span>
+                                <span className="text-slate-400 text-sm font-medium">Not Logged</span>
                             </div>
-                            <span className="text-red-400 font-semibold text-sm">{formatMinutes(selectedEntry.awakeDuration)}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="size-3 rounded-sm bg-purple-500/80"></div>
-                                <span className="text-slate-400 text-xs">Actual sleep</span>
+                        </>
+                    ) : (
+                        <>
+                            {/* Date Header */}
+                            <div className="text-white font-bold text-sm mb-3 pb-2 border-b border-white/10">
+                                {new Date(selectedEntry.date).toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    month: 'short',
+                                    day: 'numeric'
+                                })}
                             </div>
-                            <span className="text-purple-400 font-semibold text-sm">{formatTime(selectedEntry.totalSleepTime)}</span>
-                        </div>
 
-                        <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
-                            <span className="text-slate-300 text-xs font-medium">Total time in bed</span>
-                            <span className="text-white font-bold text-sm">{formatTime(selectedEntry.totalTimeInBed)}</span>
-                        </div>
-                    </div>
+                            {/* Metrics */}
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="size-3 rounded-sm bg-amber-500/80"></div>
+                                        <span className="text-slate-400 text-xs">Fell asleep in</span>
+                                    </div>
+                                    <span className="text-amber-400 font-semibold text-sm">{formatMinutes(selectedEntry.latency)}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="size-3 rounded-sm bg-red-500/80"></div>
+                                        <span className="text-slate-400 text-xs">Awake during night</span>
+                                    </div>
+                                    <span className="text-red-400 font-semibold text-sm">{formatMinutes(selectedEntry.awakeDuration)}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="size-3 rounded-sm bg-purple-500/80"></div>
+                                        <span className="text-slate-400 text-xs">Actual sleep</span>
+                                    </div>
+                                    <span className="text-purple-400 font-semibold text-sm">{formatTime(selectedEntry.totalSleepTime)}</span>
+                                </div>
+
+                                <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
+                                    <span className="text-slate-300 text-xs font-medium">Total time in bed</span>
+                                    <span className="text-white font-bold text-sm">{formatTime(selectedEntry.totalTimeInBed)}</span>
+                                </div>
+                            </div>
+                        </>
+                    )}
 
                     <p className="text-slate-600 text-[10px] text-center mt-3">Tap to dismiss</p>
                 </div>
