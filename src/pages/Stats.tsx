@@ -17,9 +17,13 @@ export default function Stats() {
     const [activeTab, setActiveTab] = useState<TabType>('hydration')
     const [periodDays, setPeriodDays] = useState<number>(7)
 
-    // Sleep data
     const {
+        logs: sleepLogs,
         loading: sleepLoading,
+        calculateStats,
+        targetHours,
+        targetBedtime,
+        targetWakeTime,
         getStatsForPeriod,
         getConsistencyScore,
         getGrogginessFactor,
@@ -81,12 +85,20 @@ export default function Stats() {
         return `${sign}${h}h ${m}m`
     }
 
-    // Explanation State
     const [explanation, setExplanation] = useState<{
         title: string;
         formula: string;
         description: string;
         variables?: { name: string; definition: string }[]
+    } | null>(null)
+
+    // Schedule detail modal state
+    const [scheduleDetail, setScheduleDetail] = useState<{
+        title: string;
+        value: string;
+        description: string;
+        reasoning: string[];
+        dataPoints?: { label: string; value: string; highlight?: boolean }[];
     } | null>(null)
 
     // Metric Explanations
@@ -462,6 +474,260 @@ export default function Stats() {
                                             </div>
                                         </button>
                                     </div>
+
+                                    {/* ═══════════════════════════════════════════
+                                        YOUR OPTIMISED SLEEP SCHEDULE
+                                    ═══════════════════════════════════════════ */}
+                                    {sleepLogs.length >= 5 && (() => {
+                                        const allStats = sleepLogs.map(log => ({ log, stats: calculateStats(log) }))
+
+                                        // --- Optimal bedtime ---
+                                        const bedtimeBuckets = new Map<number, { totalQuality: number, count: number, totalEfficiency: number }>()
+                                        allStats.forEach(({ log, stats }) => {
+                                            const [h] = log.lightsOut.split(':').map(Number)
+                                            if (!bedtimeBuckets.has(h)) bedtimeBuckets.set(h, { totalQuality: 0, count: 0, totalEfficiency: 0 })
+                                            const b = bedtimeBuckets.get(h)!
+                                            b.totalQuality += log.subjectiveQuality
+                                            b.totalEfficiency += stats.sleepEfficiency
+                                            b.count++
+                                        })
+                                        const globalAvgQ = allStats.reduce((s, a) => s + a.log.subjectiveQuality, 0) / allStats.length
+                                        const C = 3
+                                        let bestBedtimeHour = 23, bestBedtimeScore = 0
+                                        const bedtimeRanking: { hour: number, rawAvg: number, adjScore: number, count: number, avgEff: number }[] = []
+                                        bedtimeBuckets.forEach((bucket, hour) => {
+                                            const rawAvg = bucket.totalQuality / bucket.count
+                                            const adjQ = (bucket.count * rawAvg + C * globalAvgQ) / (bucket.count + C)
+                                            const avgEff = bucket.totalEfficiency / bucket.count
+                                            const score = adjQ * 6 + (avgEff / 100) * 40
+                                            bedtimeRanking.push({ hour, rawAvg, adjScore: score, count: bucket.count, avgEff })
+                                            if (score > bestBedtimeScore && bucket.count >= 2) { bestBedtimeScore = score; bestBedtimeHour = hour }
+                                        })
+                                        bedtimeRanking.sort((a, b) => b.adjScore - a.adjScore)
+
+                                        // --- Optimal duration ---
+                                        const durationBuckets = new Map<number, { totalQuality: number, count: number, totalEfficiency: number }>()
+                                        allStats.forEach(({ log, stats }) => {
+                                            const dH = Math.floor(stats.totalSleepTime / 60)
+                                            if (!durationBuckets.has(dH)) durationBuckets.set(dH, { totalQuality: 0, count: 0, totalEfficiency: 0 })
+                                            const b = durationBuckets.get(dH)!
+                                            b.totalQuality += log.subjectiveQuality
+                                            b.totalEfficiency += stats.sleepEfficiency
+                                            b.count++
+                                        })
+                                        let optDurH = Math.round(targetHours), optDurScore = 0
+                                        const durationRanking: { hour: number, rawAvg: number, adjAvg: number, count: number, avgEff: number }[] = []
+                                        durationBuckets.forEach((bucket, hour) => {
+                                            const rawAvg = bucket.totalQuality / bucket.count
+                                            const adjQ = (bucket.count * rawAvg + C * globalAvgQ) / (bucket.count + C)
+                                            const avgEff = bucket.totalEfficiency / bucket.count
+                                            durationRanking.push({ hour, rawAvg, adjAvg: adjQ, count: bucket.count, avgEff })
+                                            if (adjQ > optDurScore && bucket.count >= 2) { optDurScore = adjQ; optDurH = hour }
+                                        })
+                                        durationRanking.sort((a, b) => b.adjAvg - a.adjAvg)
+
+                                        const avgLatency = Math.round(allStats.reduce((s, a) => s + a.log.latency, 0) / allStats.length)
+                                        const avgEfficiency = Math.round(allStats.reduce((s, a) => s + a.stats.sleepEfficiency, 0) / allStats.length)
+                                        const idealBedMin = bestBedtimeHour * 60 + 30
+                                        const idealWakeMin = idealBedMin + avgLatency + optDurH * 60
+                                        const wakeH = Math.floor((idealWakeMin % (24 * 60)) / 60)
+                                        const wakeM = idealWakeMin % 60
+
+                                        const fmt12 = (h24: number, m: number) => {
+                                            const p = h24 >= 12 ? 'PM' : 'AM'
+                                            const h = h24 > 12 ? h24 - 12 : h24 === 0 ? 12 : h24
+                                            return `${h}:${m.toString().padStart(2, '0')} ${p}`
+                                        }
+                                        const hrLabel = (h: number) => {
+                                            const p = ((h % 24) + 24) % 24 >= 12 ? 'PM' : 'AM'
+                                            const d = ((h % 24) + 24) % 24 > 12 ? ((h % 24) + 24) % 24 - 12 : ((h % 24) + 24) % 24 === 0 ? 12 : ((h % 24) + 24) % 24
+                                            return `${d} ${p}`
+                                        }
+
+                                        // Tips
+                                        const tips: { emoji: string, text: string }[] = []
+                                        if (weekdayWeekend.difference > 60) tips.push({ emoji: '📅', text: `You oversleep ${Math.round(weekdayWeekend.difference)}min more on weekends. Try to keep within 30 min.` })
+                                        if (grogginess.avgMinutes > 15) tips.push({ emoji: '🥱', text: `You linger ~${Math.round(grogginess.avgMinutes)} min in bed after waking. Try putting your alarm across the room.` })
+                                        if (consistencyData.score < 70) tips.push({ emoji: '🎯', text: `Bedtime consistency is ${Math.round(consistencyData.score)}%. A steady schedule boosts quality significantly.` })
+                                        if (avgLatency > 20) tips.push({ emoji: '🧘', text: `It takes ~${avgLatency} min to fall asleep. Wind-down rituals 30 min before bed can help.` })
+                                        if (avgEfficiency < 85) tips.push({ emoji: '🛏️', text: `Efficiency is ${avgEfficiency}%. Reserve your bed for sleep only — no screens.` })
+
+                                        // Detail builders
+                                        const bedtimeDetail = {
+                                            title: '🌙 Ideal Bedtime',
+                                            value: fmt12(bestBedtimeHour, 30),
+                                            description: `Going to bed around ${hrLabel(bestBedtimeHour)} consistently gives you the best combination of sleep quality and efficiency.`,
+                                            reasoning: [
+                                                `Analyzed ${sleepLogs.length} nights across ${bedtimeBuckets.size} different bedtime hours.`,
+                                                `Used a Bayesian-adjusted score (quality × 60% + efficiency × 40%) to prevent hours with few entries from unfairly winning.`,
+                                                `${hrLabel(bestBedtimeHour)} scored highest with ${bedtimeBuckets.get(bestBedtimeHour)?.count ?? 0} nights logged.`
+                                            ],
+                                            dataPoints: bedtimeRanking.slice(0, 5).map(r => ({
+                                                label: `${hrLabel(r.hour)} (${r.count}×)`,
+                                                value: `Quality ${r.rawAvg.toFixed(1)}/10 · Eff ${Math.round(r.avgEff)}%`,
+                                                highlight: r.hour === bestBedtimeHour
+                                            }))
+                                        }
+                                        const wakeDetail = {
+                                            title: '☀️ Ideal Wake Time',
+                                            value: fmt12(wakeH, wakeM),
+                                            description: `This wake time is calculated from your ideal bedtime + your average sleep latency + your optimal sleep duration.`,
+                                            reasoning: [
+                                                `Ideal bedtime: ${fmt12(bestBedtimeHour, 30)}`,
+                                                `+ Avg time to fall asleep: ~${avgLatency} min`,
+                                                `+ Optimal sleep duration: ${optDurH}–${optDurH + 1} hours`,
+                                                `= Ideal wake: ${fmt12(wakeH, wakeM)}`,
+                                                `Your current target is ${targetWakeTime}.`
+                                            ]
+                                        }
+                                        const durationDetail = {
+                                            title: '⏱️ Optimal Duration',
+                                            value: `${optDurH}–${optDurH + 1}h`,
+                                            description: `Sleeping ${optDurH}–${optDurH + 1} hours gives you the highest quality ratings based on your logged data.`,
+                                            reasoning: [
+                                                `Bucketed all ${sleepLogs.length} nights by duration hour.`,
+                                                `Applied Bayesian smoothing to prevent small samples from skewing results.`,
+                                                `Your target is ${targetHours}h — ${Math.abs(optDurH - targetHours) < 1 ? 'very close to your optimal!' : optDurH > targetHours ? 'you may benefit from sleeping a bit more.' : 'you might be able to trim time slightly.'}`
+                                            ],
+                                            dataPoints: durationRanking.slice(0, 5).map(r => ({
+                                                label: `${r.hour}–${r.hour + 1}h (${r.count}×)`,
+                                                value: `Quality ${r.rawAvg.toFixed(1)}/10 · Eff ${Math.round(r.avgEff)}%`,
+                                                highlight: r.hour === optDurH
+                                            }))
+                                        }
+                                        const latencyDetail = {
+                                            title: '😴 Fall Asleep Time',
+                                            value: `~${avgLatency} min`,
+                                            description: `On average, it takes you ${avgLatency} minutes to fall asleep after lights out.`,
+                                            reasoning: [
+                                                `Averaged sleep latency across all ${sleepLogs.length} logs.`,
+                                                avgLatency <= 15 ? `This is excellent — under 15 min is considered ideal.` : avgLatency <= 25 ? `This is normal, but could be improved with a consistent wind-down routine.` : `This is high. Consider no screens 30 min before bed, and keep the room cool and dark.`,
+                                                `Latency is factored into the wake time calculation to keep the schedule realistic.`
+                                            ]
+                                        }
+
+                                        return (
+                                            <div className="bg-gradient-to-br from-[rgba(25,34,51,0.9)] to-[rgba(40,20,60,0.7)] backdrop-blur-md border border-purple-500/20 rounded-2xl p-5 shadow-[0_0_30px_rgba(147,51,234,0.1)]">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-lg">✨</span>
+                                                    <h3 className="text-white font-bold text-sm">Your Optimised Sleep Schedule</h3>
+                                                </div>
+                                                <p className="text-slate-400 text-[11px] mb-5">Based on {sleepLogs.length} nights — tap any card for details.</p>
+
+                                                {/* Hero cards — clickable */}
+                                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                                    <button onClick={() => setScheduleDetail(bedtimeDetail)} className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3 text-center transition-all active:scale-95 hover:bg-purple-500/20">
+                                                        <span className="text-lg">🌙</span>
+                                                        <p className="text-slate-400 text-[9px] uppercase font-bold tracking-wider mt-1 mb-1">Ideal Bedtime</p>
+                                                        <p className="text-purple-300 text-lg font-bold">{fmt12(bestBedtimeHour, 30)}</p>
+                                                        <p className="text-purple-400/50 text-[9px] mt-1">Tap for details →</p>
+                                                    </button>
+                                                    <button onClick={() => setScheduleDetail(wakeDetail)} className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-center transition-all active:scale-95 hover:bg-amber-500/20">
+                                                        <span className="text-lg">☀️</span>
+                                                        <p className="text-slate-400 text-[9px] uppercase font-bold tracking-wider mt-1 mb-1">Ideal Wake Time</p>
+                                                        <p className="text-amber-300 text-lg font-bold">{fmt12(wakeH, wakeM)}</p>
+                                                        <p className="text-amber-400/50 text-[9px] mt-1">Tap for details →</p>
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-3 gap-2 mb-5">
+                                                    <button onClick={() => setScheduleDetail(durationDetail)} className="bg-white/[0.04] rounded-xl p-2.5 text-center transition-all active:scale-95 hover:bg-white/[0.08]">
+                                                        <p className="text-slate-500 text-[9px] uppercase font-bold tracking-wider mb-1">Duration</p>
+                                                        <p className="text-white text-sm font-bold">{optDurH}–{optDurH + 1}h</p>
+                                                    </button>
+                                                    <button onClick={() => setScheduleDetail(latencyDetail)} className="bg-white/[0.04] rounded-xl p-2.5 text-center transition-all active:scale-95 hover:bg-white/[0.08]">
+                                                        <p className="text-slate-500 text-[9px] uppercase font-bold tracking-wider mb-1">Fall Asleep</p>
+                                                        <p className="text-white text-sm font-bold">~{avgLatency}min</p>
+                                                    </button>
+                                                    <div className="bg-white/[0.04] rounded-xl p-2.5 text-center">
+                                                        <p className="text-slate-500 text-[9px] uppercase font-bold tracking-wider mb-1">Your Target</p>
+                                                        <p className="text-white text-sm font-bold">{targetHours}h</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Target comparison */}
+                                                <div className="bg-white/[0.03] rounded-xl p-3 mb-4">
+                                                    <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-2">vs Your Targets</p>
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-slate-500 text-xs">Bedtime</span>
+                                                            <span className="text-slate-300 text-xs font-medium">{targetBedtime} → <span className="text-purple-400 font-bold">{fmt12(bestBedtimeHour, 30)}</span></span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-slate-500 text-xs">Wake</span>
+                                                            <span className="text-slate-300 text-xs font-medium">{targetWakeTime} → <span className="text-amber-400 font-bold">{fmt12(wakeH, wakeM)}</span></span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-slate-500 text-xs">Duration</span>
+                                                            <span className="text-slate-300 text-xs font-medium">{targetHours}h → <span className="text-green-400 font-bold">{optDurH}–{optDurH + 1}h</span></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Tips */}
+                                                {tips.length > 0 && (
+                                                    <div>
+                                                        <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-2.5">Personalised Tips</p>
+                                                        <div className="space-y-2">
+                                                            {tips.map((tip, i) => (
+                                                                <div key={i} className="flex items-start gap-2 bg-white/[0.03] rounded-lg px-3 py-2">
+                                                                    <span className="text-sm mt-0.5 shrink-0">{tip.emoji}</span>
+                                                                    <p className="text-slate-300 text-[11px] leading-relaxed">{tip.text}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })()}
+
+                                    {/* Schedule Detail Modal */}
+                                    {scheduleDetail && (
+                                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setScheduleDetail(null)}>
+                                            <div className="bg-[#101622] border border-purple-500/20 w-full max-w-sm rounded-2xl p-6 shadow-[0_0_40px_rgba(147,51,234,0.15)] animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h3 className="text-lg font-bold text-white">{scheduleDetail.title}</h3>
+                                                    <button onClick={() => setScheduleDetail(null)} className="text-slate-500 hover:text-white text-xl leading-none">×</button>
+                                                </div>
+
+                                                <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 text-center mb-4">
+                                                    <p className="text-purple-300 text-2xl font-bold">{scheduleDetail.value}</p>
+                                                </div>
+
+                                                <p className="text-slate-300 text-sm leading-relaxed mb-4">{scheduleDetail.description}</p>
+
+                                                <div className="mb-4">
+                                                    <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-2">How We Calculated This</p>
+                                                    <div className="space-y-2">
+                                                        {scheduleDetail.reasoning.map((r, i) => (
+                                                            <div key={i} className="flex items-start gap-2">
+                                                                <span className="text-purple-400 text-xs mt-0.5 shrink-0">•</span>
+                                                                <p className="text-slate-400 text-xs leading-relaxed">{r}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {scheduleDetail.dataPoints && scheduleDetail.dataPoints.length > 0 && (
+                                                    <div>
+                                                        <p className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-2">Ranking</p>
+                                                        <div className="space-y-1.5">
+                                                            {scheduleDetail.dataPoints.map((dp, i) => (
+                                                                <div key={i} className={`flex items-center justify-between py-1.5 px-3 rounded-lg ${dp.highlight ? 'bg-purple-500/15 border border-purple-500/20' : 'bg-white/[0.03]'}`}>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {dp.highlight && <span className="text-[10px]">⭐</span>}
+                                                                        <span className={`text-xs font-medium ${dp.highlight ? 'text-purple-300' : 'text-slate-400'}`}>{dp.label}</span>
+                                                                    </div>
+                                                                    <span className={`text-[11px] font-medium ${dp.highlight ? 'text-purple-300' : 'text-slate-500'}`}>{dp.value}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* ═══════════════════════════════════════════
                                         MIDDLE ROW: Consistency Tracker (Full Width)

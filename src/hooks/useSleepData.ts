@@ -604,11 +604,16 @@ export const useSleepData = () => {
     const getBedtimeQualityData = (days: number = 30) => {
         const periodLogs = filterLogsByPeriod(days)
 
-        return periodLogs.map(log => ({
-            date: log.date,
-            lightsOut: log.lightsOut,
-            quality: log.subjectiveQuality
-        }))
+        return periodLogs.map(log => {
+            const stats = calculateStats(log)
+            return {
+                date: log.date,
+                lightsOut: log.lightsOut,
+                wakeUp: log.wakeUp,
+                quality: log.subjectiveQuality,
+                totalSleepTime: stats.totalSleepTime
+            }
+        })
     }
 
     // Get stats for specific log or latest
