@@ -603,24 +603,55 @@ export default function Sleep() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <div className="flex justify-between">
-                                        <label className="text-xs text-slate-400 uppercase font-bold">Subjective Quality (1-10)</label>
-                                        <span className={`text-sm font-bold ${neonText}`}>{formData.subjectiveQuality}</span>
-                                    </div>
-                                    <input
-                                        type="range"
-                                        name="subjectiveQuality"
-                                        min="1"
-                                        max="10"
-                                        step="0.5"
-                                        value={formData.subjectiveQuality}
-                                        onChange={handleInputChange}
-                                        className="w-full accent-purple-500 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                                    />
-                                    <div className="flex justify-between text-xs text-slate-500 px-1">
-                                        <span>Terrible</span>
-                                        <span>Excellent</span>
-                                    </div>
+                                    {(() => {
+                                        const q = formData.subjectiveQuality
+                                        const descriptors: Record<number, { label: string; color: string }> = {
+                                            1:  { label: 'Still fatigued — no recovery from sleep',                color: 'text-red-500' },
+                                            2:  { label: 'Minimal recovery — heavy fatigue remains',              color: 'text-red-400' },
+                                            3:  { label: 'Some recovery — still noticeably fatigued',             color: 'text-orange-400' },
+                                            4:  { label: 'Partial recovery — mild fatigue and low alertness',     color: 'text-amber-400' },
+                                            5:  { label: 'Moderate recovery — neither fatigued nor alert',        color: 'text-yellow-400' },
+                                            6:  { label: 'Adequate recovery — mostly alert, slight fatigue',      color: 'text-lime-400' },
+                                            7:  { label: 'Good recovery — alert and no fatigue',                  color: 'text-green-400' },
+                                            8:  { label: 'Strong recovery — fully alert and physically ready',    color: 'text-emerald-400' },
+                                            9:  { label: 'Near-complete recovery — high energy, zero fatigue',    color: 'text-teal-400' },
+                                            10: { label: 'Full recovery — peak alertness, zero fatigue',          color: 'text-cyan-400' },
+                                        }
+                                        const key = Math.round(q) as keyof typeof descriptors
+                                        const d = descriptors[key] ?? descriptors[5]
+                                        return (
+                                            <>
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-xs text-slate-400 uppercase font-bold">Subjective Quality (1–10)</label>
+                                                    <span className={`text-sm font-bold ${neonText}`}>{q}/10</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 leading-snug -mt-0.5">
+                                                    Rate after morning grogginess clears (e.g. post face wash) — always at the same point in your routine.
+                                                </p>
+
+                                                {/* Descriptor */}
+                                                <div className="px-3 py-2 rounded-xl bg-white/[0.03] border border-white/5 transition-all duration-200">
+                                                    <span className={`text-[11.5px] font-medium ${d.color} transition-colors duration-200`}>{d.label}</span>
+                                                </div>
+
+                                                <input
+                                                    type="range"
+                                                    name="subjectiveQuality"
+                                                    min="1"
+                                                    max="10"
+                                                    step="0.5"
+                                                    value={q}
+                                                    onChange={handleInputChange}
+                                                    className="w-full accent-purple-500 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                                                />
+
+                                                <div className="flex justify-between text-[10px] text-slate-500 px-0.5 -mt-0.5">
+                                                    <span>Not rested</span>
+                                                    <span>Entirely rested</span>
+                                                </div>
+                                            </>
+                                        )
+                                    })()}
                                 </div>
 
                                 <button
