@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, createContext, ReactNode } from 'react'
+import { useState, useEffect, useCallback, createContext } from 'react'
+import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { SleepLog as DbSleepLog, SleepSettings } from '../lib/database.types'
