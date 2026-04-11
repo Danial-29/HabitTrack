@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { SleepProvider } from './context/SleepContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import Hydration from './pages/Hydration'
@@ -15,52 +16,54 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          {/* Public Route */}
-          <Route path="/auth" element={<Auth />} />
+        <SleepProvider>
+          <Routes>
+            {/* Public Route */}
+            <Route path="/auth" element={<Auth />} />
 
-          {/* Protected Routes */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/hydration" element={
-            <ProtectedRoute>
-              <Hydration />
-            </ProtectedRoute>
-          } />
-          <Route path="/hydration/history" element={
-            <ProtectedRoute>
-              <HydrationHistory />
-            </ProtectedRoute>
-          } />
-          <Route path="/hydration/heatmap" element={
-            <ProtectedRoute>
-              <HydrationHeatmap />
-            </ProtectedRoute>
-          } />
-          <Route path="/sleep" element={
-            <ProtectedRoute>
-              <Sleep />
-            </ProtectedRoute>
-          } />
-          <Route path="/habits" element={
-            <ProtectedRoute>
-              <Habits />
-            </ProtectedRoute>
-          } />
-          <Route path="/settings" element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          } />
-          <Route path="/stats" element={
-            <ProtectedRoute>
-              <Stats />
-            </ProtectedRoute>
-          } />
-        </Routes>
+            {/* Protected Routes */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/hydration" element={
+              <ProtectedRoute>
+                <Hydration />
+              </ProtectedRoute>
+            } />
+            <Route path="/hydration/history" element={
+              <ProtectedRoute>
+                <HydrationHistory />
+              </ProtectedRoute>
+            } />
+            <Route path="/hydration/heatmap" element={
+              <ProtectedRoute>
+                <HydrationHeatmap />
+              </ProtectedRoute>
+            } />
+            <Route path="/sleep" element={
+              <ProtectedRoute>
+                <Sleep />
+              </ProtectedRoute>
+            } />
+            <Route path="/habits" element={
+              <ProtectedRoute>
+                <Habits />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            } />
+            <Route path="/stats" element={
+              <ProtectedRoute>
+                <Stats />
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </SleepProvider>
       </AuthProvider>
     </BrowserRouter>
   )

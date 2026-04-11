@@ -22,6 +22,7 @@ export default function Sleep() {
     const [editingLogId, setEditingLogId] = useState<string | null>(null)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [formError, setFormError] = useState<string | null>(null)
     const [formData, setFormData] = useState({
         lightsOut: '23:00',
         wakeUp: '07:00',
@@ -83,6 +84,7 @@ export default function Sleep() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsSubmitting(true)
+        setFormError(null)
 
         // Validation: Out of bed cannot be earlier than Wake up
         const timeToMins = (time: string) => {
@@ -99,7 +101,7 @@ export default function Sleep() {
         }
 
         if (outMins < wakeMins) {
-            alert("Out of bed time cannot be earlier than wake up time.")
+            setFormError('Out of bed time cannot be earlier than wake up time.')
             setIsSubmitting(false)
             return
         }
@@ -114,13 +116,17 @@ export default function Sleep() {
             subjectiveQuality: Number(formData.subjectiveQuality)
         }
 
-        if (editingLogId) {
-            await updateLog(editingLogId, payload)
-        } else {
-            await addLog(payload)
-        }
+        const result = editingLogId
+            ? await updateLog(editingLogId, payload)
+            : await addLog(payload)
 
         setIsSubmitting(false)
+
+        if (result.error) {
+            setFormError(result.error)
+            return
+        }
+
         setIsEntryModalOpen(false)
         setEditingLogId(null)
     }
@@ -653,6 +659,12 @@ export default function Sleep() {
                                         )
                                     })()}
                                 </div>
+
+                                {formError && (
+                                    <div className="px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 mt-4">
+                                        <p className="text-[12px] text-red-400 font-medium">{formError}</p>
+                                    </div>
+                                )}
 
                                 <button
                                     type="submit"
