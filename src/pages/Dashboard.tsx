@@ -20,7 +20,7 @@ export default function Dashboard() {
     const hydrationTrend = getDailyTrendData(7) // Get last 7 days (Oldest -> Newest)
 
     // --- Sleep Data (from Supabase) ---
-    const { logs: sleepLogs, latestStats, calculateStats, loading: sleepLoading } = useSleepData()
+    const { logs: sleepLogs, latestStats, calculateStats, loading: sleepLoading, getStatsForPeriod } = useSleepData()
 
     // Get latest sleep log details
     const latestLog = sleepLogs.length > 0 ? sleepLogs[0] : null
@@ -220,9 +220,9 @@ export default function Dashboard() {
                                             <span className="text-white text-sm font-bold">{latestStats ? `${Math.round(latestStats.sleepEfficiency)}%` : '--'}</span>
                                         </div>
                                         <div className="bg-slate-900/50 p-2.5 rounded-xl border border-white/5 pointer-events-none text-center">
-                                            <p className="text-slate-500 text-[9px] uppercase font-bold tracking-wider mb-1">Debt</p>
-                                            <span className={`text-sm font-bold ${latestStats && latestStats.sleepDebt > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                                                {latestStats ? `${latestStats.sleepDebt > 0 ? '+' : ''}${latestStats.sleepDebt.toFixed(1)}h` : '--'}
+                                            <p className="text-slate-500 text-[9px] uppercase font-bold tracking-wider mb-1">Acute Debt</p>
+                                            <span className={`text-sm font-bold ${getStatsForPeriod(14).totalSleepDebt > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                                {getStatsForPeriod(14).totalSleepDebt > 0 ? `+${getStatsForPeriod(14).totalSleepDebt.toFixed(1)}h` : '0h'}
                                             </span>
                                         </div>
                                     </div>

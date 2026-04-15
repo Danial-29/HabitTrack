@@ -104,6 +104,53 @@ function useSleepDataProvider() {
         fetchData()
     }, [fetchData])
 
+    // Determine Biological Optimal Sleep Duration
+    const getOptimalSleepDuration = useCallback(() => {
+        if (logs.length < 5) return 8 // Scientific default
+
+        const durationBuckets = new Map<number, { totalQuality: number, count: number }>()
+
+        logs.forEach(log => {
+            const parseTime = (timeStr: string) => {
+                const [h, m] = timeStr.split(':').map(Number)
+                return h * 60 + m
+            }
+            let start = parseTime(log.lightsOut)
+            let end = parseTime(log.outOfBed)
+            if (start > end && start > 12 * 60) {
+                end += 24 * 60
+            }
+            const totalTimeInBed = Math.max(0, end - start)
+            const totalSleepTime = Math.max(0, totalTimeInBed - log.latency - log.awakeDuration)
+            
+            const durationHour = Math.floor(totalSleepTime / 60)
+            if (!durationBuckets.has(durationHour)) {
+                durationBuckets.set(durationHour, { totalQuality: 0, count: 0 })
+            }
+            const bucket = durationBuckets.get(durationHour)!
+            bucket.totalQuality += log.subjectiveQuality
+            bucket.count++
+        })
+
+        const globalAvgQuality = logs.reduce((sum, log) => sum + log.subjectiveQuality, 0) / logs.length
+        const C = 3 // Bayesian smoothing constant
+        let optimalHour = 8
+        let highestScore = 0
+
+        durationBuckets.forEach((bucket, hour) => {
+            const rawAvg = bucket.totalQuality / bucket.count
+            // Bayesian adjusted quality
+            const adjustedQuality = (bucket.count * rawAvg + C * globalAvgQuality) / (bucket.count + C)
+            
+            if (adjustedQuality > highestScore && bucket.count >= 2) {
+                highestScore = adjustedQuality
+                optimalHour = hour
+            }
+        })
+
+        return optimalHour
+    }, [logs])
+
     // Calculate stats for a log
     const calculateStats = (log: SleepLog): DailySleepStats => {
         const parseTime = (timeStr: string) => {
@@ -159,9 +206,9 @@ function useSleepDataProvider() {
         // Total Score (0-100)
         const sleepQualityScore = efficiencyScore + feelScore + latencyScore + awakePenalty
 
-        const targetHours = settings?.target_hours ?? 8
-        const actualHours = totalSleepTime / 60
-        const sleepDebt = targetHours - actualHours
+        // Sleep debt is now calculated in getStatsForPeriod dynamically
+        const sleepDebt = 0 
+
 
         return {
             totalTimeInBed,
@@ -374,19 +421,45 @@ function useSleepDataProvider() {
 
         let totalQuality = 0
         let totalDuration = 0
-        let totalSleepDebt = 0
 
         periodLogs.forEach(log => {
             const stats = calculateStats(log)
             totalQuality += stats.sleepQualityScore
             totalDuration += stats.totalSleepTime
-            totalSleepDebt += stats.sleepDebt
+        })
+        
+        // Accurate Biological Sleep Debt (Capped to 14 days, no banking)
+        const optimalDuration = getOptimalSleepDuration()
+        const recentLogs = filterLogsByPeriod(14) // Max 14 day sum because bodies don't track past that
+        
+        // If user asked for 7 days, we only sum the 7 days passed in, not the full 14.
+        const debtLogsToSum = days > 0 && days < 14 ? periodLogs : recentLogs
+        
+        let acuteSleepDebt = 0
+        debtLogsToSum.forEach(log => {
+            // Recalculate duration easily
+            const parseTime = (timeStr: string) => {
+                const [h, m] = timeStr.split(':').map(Number)
+                return h * 60 + m
+            }
+            let start = parseTime(log.lightsOut)
+            let end = parseTime(log.outOfBed)
+            if (start > end && start > 12 * 60) end += 24 * 60
+            
+            const totalTimeInBed = Math.max(0, end - start)
+            const totalSleepTime = Math.max(0, totalTimeInBed - log.latency - log.awakeDuration)
+            
+            const actualHours = totalSleepTime / 60
+            
+            // Core Change: Math.max(0, x) prevents banking. optimalDuration replaces arbitrary target_hours.
+            const dailyDebt = Math.max(0, optimalDuration - actualHours)
+            acuteSleepDebt += dailyDebt
         })
 
         return {
             avgQuality: totalQuality / periodLogs.length,
             avgDuration: totalDuration / periodLogs.length, // in minutes
-            totalSleepDebt: totalSleepDebt, // cumulative debt in hours
+            totalSleepDebt: acuteSleepDebt, // cumulative debt in hours
             logsCount: periodLogs.length
         }
     }

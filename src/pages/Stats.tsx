@@ -124,12 +124,12 @@ export default function Stats() {
             ]
         },
         debt: {
-            title: "Sleep Debt",
-            formula: "∑(Target Hours - Actual Hours)",
-            description: "The accumulated biological need for sleep relative to your personal target.",
+            title: "Acute 14-Day Sleep Debt",
+            formula: "∑ max(0, Biological Baseline - Actual Hours) over 14 days",
+            description: "The accumulated biological need for sleep relative to your historical optimum, strictly capped at a 14-day rolling window.",
             variables: [
-                { name: "Target Hours", definition: "Personal daily sleep goal (Default: 8 hours)." },
-                { name: "Actual Hours", definition: "Net sleep duration recorded for the period." }
+                { name: "Biological Baseline", definition: "Your data-driven optimal sleep duration (Default: 8 hours)." },
+                { name: "Actual Hours", definition: "Net sleep duration recorded for the night." }
             ]
         },
         consistency: {
@@ -452,7 +452,7 @@ export default function Stats() {
                                         >
                                             <div className="flex items-center gap-2 mb-2">
                                                 <AlertTriangle size={14} className={periodStats.totalSleepDebt > 0 ? 'text-red-400' : 'text-green-400'} />
-                                                <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Sleep Debt</span>
+                                                <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">14-Day Debt</span>
                                             </div>
                                             <div className={`text-2xl font-bold ${periodStats.totalSleepDebt > 0 ? 'text-red-400' : 'text-green-400'}`}>
                                                 {periodStats.logsCount > 0 ? formatDebt(periodStats.totalSleepDebt) : '--'}
